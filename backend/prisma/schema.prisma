@@ -1,0 +1,212 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Perfil {
+  ADMIN
+  ALMOXARIFE
+  GESTOR
+  OPERADOR
+}
+
+enum TipoPessoa {
+  PF
+  PJ
+}
+
+enum TipoMovimentacao {
+  ENTRADA
+  SAIDA
+  ESTORNO
+  DESCARTE
+}
+
+enum DestinoSaida {
+  BENEFICIARIO
+  SETOR
+}
+
+enum StatusValidade {
+  VIGENTE
+  PROXIMO
+  VENCIDO
+  ADICIONAL
+  DESCARTE
+}
+
+model Usuario {
+  id        String   @id @default(uuid())
+  nome      String
+  email     String   @unique
+  senha     String
+  perfil    Perfil   @default(OPERADOR)
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  movimentacoes Movimentacao[]
+  logs          LogAuditoria[]
+
+  @@map("usuarios")
+}
+
+model Categoria {
+  id        String   @id @default(uuid())
+  nome      String   @unique
+  descricao String?
+  itens     Item[]
+  createdAt DateTime @default(now())
+
+  @@map("categorias")
+}
+
+model Setor {
+  id          String   @id @default(uuid())
+  nome        String   @unique
+  responsavel String?
+  ativo       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  itens         Item[]
+  movimentacoes Movimentacao[]
+
+  @@map("setores")
+}
+
+model Item {
+  id            String    @id @default(uuid())
+  codigoInterno String    @unique @map("codigo_interno")
+  codigoEan     String?   @map("codigo_ean")
+  nome          String
+  descricao     String?
+  unidadeMedida String    @default("un") @map("unidade_medida")
+  estoqueMinimo Decimal   @default(0) @map("estoque_minimo") @db.Decimal(10, 2)
+  saldoAtual    Decimal   @default(0) @map("saldo_atual") @db.Decimal(10, 2)
+  dataValidade  DateTime? @map("data_validade") @db.Date
+  localizacao   String?
+  ativo         Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  categoriaId String    @map("categoria_id")
+  categoria   Categoria @relation(fields: [categoriaId], references: [id])
+  setorId     String?   @map("setor_id")
+  setor       Setor?    @relation(fields: [setorId], references: [id])
+
+  movimentacaoItens MovimentacaoItem[]
+
+  @@index([codigoEan])
+  @@index([nome])
+  @@map("itens")
+}
+
+model Doador {
+  id         String     @id @default(uuid())
+  tipo       TipoPessoa @default(PF)
+  nome       String
+  cpfCnpj    String     @unique @map("cpf_cnpj")
+  telefone   String?
+  email      String?
+  endereco   String?
+  observacao String?
+  ativo      Boolean    @default(true)
+  createdAt  DateTime   @default(now())
+
+  movimentacoes Movimentacao[]
+
+  @@map("doadores")
+}
+
+model Beneficiario {
+  id               String    @id @default(uuid())
+  nome             String
+  cpf              String    @unique
+  dataNascimento   DateTime? @map("data_nascimento") @db.Date
+  telefone         String?
+  endereco         String?
+  bairro           String?
+  situacaoFamiliar String?   @map("situacao_familiar")
+  observacao       String?
+  ativo            Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+
+  movimentacoes Movimentacao[]
+
+  @@map("beneficiarios")
+}
+
+model Movimentacao {
+  id                String           @id @default(uuid())
+  tipo              TipoMovimentacao
+  destinoSaida      DestinoSaida?    @map("destino_saida")
+  dataMovimentacao  DateTime         @default(now()) @map("data_movimentacao") @db.Date
+  finalidade        String?
+  observacao        String?
+  confirmadoMinimo  Boolean          @default(false) @map("confirmado_minimo")
+  createdAt         DateTime         @default(now())
+
+  usuarioId      String        @map("usuario_id")
+  usuario        Usuario       @relation(fields: [usuarioId], references: [id])
+  doadorId       String?       @map("doador_id")
+  doador         Doador?       @relation(fields: [doadorId], references: [id])
+  beneficiarioId String?       @map("beneficiario_id")
+  beneficiario   Beneficiario? @relation(fields: [beneficiarioId], references: [id])
+  setorId        String?       @map("setor_id")
+  setor          Setor?        @relation(fields: [setorId], references: [id])
+  estornoDeId    String?       @unique @map("estorno_de_id")
+  estornoDe      Movimentacao? @relation("Estorno", fields: [estornoDeId], references: [id])
+  estornadoPor   Movimentacao? @relation("Estorno")
+
+  itens MovimentacaoItem[]
+
+  @@index([dataMovimentacao])
+  @@map("movimentacoes")
+}
+
+model MovimentacaoItem {
+  id             String   @id @default(uuid())
+  quantidade     Decimal  @db.Decimal(10, 2)
+  dataValidade   DateTime? @map("data_validade") @db.Date
+  saldoAnterior  Decimal  @map("saldo_anterior") @db.Decimal(10, 2)
+  saldoPosterior Decimal  @map("saldo_posterior") @db.Decimal(10, 2)
+
+  movimentacaoId String       @map("movimentacao_id")
+  movimentacao   Movimentacao @relation(fields: [movimentacaoId], references: [id], onDelete: Cascade)
+  itemId         String       @map("item_id")
+  item           Item         @relation(fields: [itemId], references: [id])
+
+  @@map("movimentacao_itens")
+}
+
+model LogAuditoria {
+  id        String   @id @default(uuid())
+  acao      String
+  entidade  String
+  entidadeId String? @map("entidade_id")
+  detalhes  Json?
+  createdAt DateTime @default(now())
+
+  usuarioId String  @map("usuario_id")
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([createdAt])
+  @@map("logs_auditoria")
+}
+
+model Notificacao {
+  id        String   @id @default(uuid())
+  tipo      String
+  titulo    String
+  mensagem  String
+  lida      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("notificacoes")
+}
