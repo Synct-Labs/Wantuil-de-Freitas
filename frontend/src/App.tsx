@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
+import Icon from './components/Icon';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Itens from './pages/Itens';
@@ -22,11 +23,14 @@ function RequerPermissao({ acao, children }: { acao: string; children: JSX.Eleme
   const { podeFazer } = useAuth();
   if (!podeFazer(acao)) {
     return (
-      <div className="card" style={{ margin: 20 }}>
-        <h3 style={{ marginBottom: 8 }}>🔒 Acesso negado</h3>
-        <p style={{ color: 'var(--text2)', fontSize: 13 }}>
-          Seu perfil não tem permissão para acessar esta página. Fale com um administrador.
-        </p>
+      <div className="card" style={{ maxWidth: 500, margin: '40px auto' }}>
+        <div className="empty-state">
+          <Icon name="lock" size={40} color="var(--text-3)" style={{ margin: '0 auto 12px' }} />
+          <div className="empty-state-title" style={{ fontSize: 15 }}>Acesso negado</div>
+          <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 6 }}>
+            Seu perfil não tem permissão para acessar esta página. Fale com um administrador.
+          </div>
+        </div>
       </div>
     );
   }

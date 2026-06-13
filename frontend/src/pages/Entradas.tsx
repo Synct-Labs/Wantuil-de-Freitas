@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../api/client';
 import Scanner from '../components/Scanner';
+import Icon from '../components/Icon';
 import { fmtData } from '../utils/format';
 
 interface ItemLote { itemId: string; nome: string; quantidade: number; dataValidade?: string; codigoEan?: string }
@@ -50,7 +51,7 @@ export default function Entradas() {
       });
       setItens([]); setDoadorId(''); setObservacao('');
       carregarMovs();
-      alert('Entrada registrada com sucesso!');
+      alert('Entrada registrada com sucesso.');
     } catch (e: any) {
       setErro(e.response?.data?.message || 'Erro ao registrar');
     } finally { setSalvando(false); }
@@ -65,54 +66,86 @@ export default function Entradas() {
 
   return (
     <div>
-      <h2 style={{ fontSize: 16, marginBottom: 16 }}>Entradas (Doações)</h2>
-      <div className="grid2">
+      <h2 style={{ fontSize: 17, fontWeight: 600, marginBottom: 18 }} className="desktop-only">Entradas — Doações Recebidas</h2>
+
+      <div className="grid-2">
         <div className="card">
-          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text2)', marginBottom: 12 }}>➕ Registrar entrada</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <Icon name="arrow-down" size={16} color="var(--green)" />
+            <span style={{ fontSize: 13, fontWeight: 600 }}>Registrar nova entrada</span>
+          </div>
 
           <label className="label">Doador</label>
-          <select className="input" value={doadorId} onChange={(e) => setDoadorId(e.target.value)} style={{ marginBottom: 12 }}>
-            <option value="">Doação avulsa</option>
+          <select className="select" value={doadorId}
+            onChange={(e) => setDoadorId(e.target.value)} style={{ marginBottom: 14 }}>
+            <option value="">Doação avulsa (sem doador identificado)</option>
             {doadores.map((d: any) => <option key={d.id} value={d.id}>{d.nome}</option>)}
           </select>
 
-          <div style={{ border: '0.5px solid var(--border)', borderRadius: 8, padding: 10, marginBottom: 12 }}>
-            <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8, fontWeight: 500 }}>Itens</div>
+          <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 8, fontWeight: 600,
+              textTransform: 'uppercase', letterSpacing: '.04em' }}>Itens da doação</div>
+
             <div style={{ display: 'flex', gap: 6, marginBottom: 8, position: 'relative' }}>
-              <input className="input" placeholder="Buscar item ou digitar EAN..." value={busca}
-                onChange={(e) => setBusca(e.target.value)} style={{ flex: 1 }} />
-              <button type="button" className="btn" onClick={() => setShowScanner(true)}>📷</button>
+              <input className="input" placeholder="Buscar item ou digitar código"
+                value={busca} onChange={(e) => setBusca(e.target.value)} style={{ flex: 1 }} />
+              <button type="button" className="btn" onClick={() => setShowScanner(true)} title="Scanner">
+                <Icon name="barcode" size={14} />
+              </button>
               {sugestoes.length > 0 && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff',
-                  border: '0.5px solid var(--border2)', borderRadius: 8, marginTop: 2, zIndex: 10 }}>
+                <div style={{
+                  position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4,
+                  background: 'var(--surface)', border: '1px solid var(--border-2)',
+                  borderRadius: 6, zIndex: 10, maxHeight: 240, overflowY: 'auto',
+                  boxShadow: '0 6px 16px rgba(0,0,0,0.08)',
+                }}>
                   {sugestoes.map((s) => (
                     <div key={s.id} onClick={() => adicionarItem(s)}
-                      style={{ padding: 8, cursor: 'pointer', borderBottom: '0.5px solid var(--border)' }}>
+                      style={{ padding: '8px 12px', cursor: 'pointer',
+                        borderBottom: '1px solid var(--border)' }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-2)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
                       <div style={{ fontSize: 13, fontWeight: 500 }}>{s.nome}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text2)' }}>Saldo: {s.saldoAtual} {s.unidadeMedida}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-2)' }}>
+                        Saldo: {s.saldoAtual} {s.unidadeMedida}
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
+            {itens.length === 0 && (
+              <div style={{ padding: '20px 0', textAlign: 'center', fontSize: 12, color: 'var(--text-3)' }}>
+                Nenhum item adicionado ainda
+              </div>
+            )}
+
             {itens.map((it, idx) => (
-              <div key={idx} style={{ background: 'var(--g50)', borderRadius: 6, padding: 8, marginBottom: 6 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{it.nome}</div>
+              <div key={idx} style={{
+                background: 'var(--surface-2)', borderRadius: 6,
+                padding: 10, marginBottom: 6,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
+                      overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.nome}</div>
                   </div>
-                  <button className="btn sm" onClick={() => imprimirEtiquetas(it)} title="Imprimir etiquetas">🏷️</button>
-                  <button className="btn sm" onClick={() => setItens(itens.filter((_, i) => i !== idx))}>✕</button>
+                  <button className="btn icon sm" onClick={() => imprimirEtiquetas(it)} title="Etiquetas">
+                    <Icon name="tag" size={13} />
+                  </button>
+                  <button className="btn icon sm" onClick={() => setItens(itens.filter((_, i) => i !== idx))} title="Remover">
+                    <Icon name="x" size={13} />
+                  </button>
                 </div>
-                <div className="grid2" style={{ marginTop: 6 }}>
+                <div className="grid-2" style={{ gap: 6 }}>
                   <div>
-                    <div style={{ fontSize: 10, color: 'var(--text2)' }}>Qtd</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-2)', marginBottom: 2 }}>Quantidade</div>
                     <input className="input" type="number" min="1" value={it.quantidade}
                       onChange={(e) => { const v = [...itens]; v[idx].quantidade = parseFloat(e.target.value) || 0; setItens(v); }} />
                   </div>
                   <div>
-                    <div style={{ fontSize: 10, color: 'var(--text2)' }}>Validade (opcional)</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-2)', marginBottom: 2 }}>Validade (opcional)</div>
                     <input className="input" type="date" value={it.dataValidade}
                       onChange={(e) => { const v = [...itens]; v[idx].dataValidade = e.target.value; setItens(v); }} />
                   </div>
@@ -122,31 +155,61 @@ export default function Entradas() {
           </div>
 
           <label className="label">Observações</label>
-          <textarea className="input" rows={2} value={observacao} onChange={(e) => setObservacao(e.target.value)} style={{ marginBottom: 12 }} />
-          {erro && <div style={{ color: 'var(--r600)', fontSize: 12, marginBottom: 10 }}>{erro}</div>}
-          <button className="btn primary" style={{ width: '100%', justifyContent: 'center' }} onClick={salvar} disabled={salvando}>
-            {salvando ? 'Salvando...' : '✅ Confirmar entrada'}
+          <textarea className="input" rows={2} value={observacao}
+            onChange={(e) => setObservacao(e.target.value)}
+            style={{ marginBottom: 14, resize: 'vertical' }} placeholder="Opcional" />
+
+          {erro && (
+            <div style={{ padding: '8px 10px', borderRadius: 6, background: 'var(--r-50)',
+              color: 'var(--r-600)', fontSize: 12, marginBottom: 12,
+              display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Icon name="alert-circle" size={14} />{erro}
+            </div>
+          )}
+
+          <button className="btn primary" style={{ width: '100%', justifyContent: 'center' }}
+            onClick={salvar} disabled={salvando}>
+            {salvando ? <><span className="spinner" /> Salvando</> : <><Icon name="check" size={14} /> Confirmar entrada</>}
           </button>
         </div>
 
         <div className="card">
-          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text2)', marginBottom: 12 }}>📋 Entradas recentes</div>
-          {movs.map((m) => (
-            <div key={m.id} style={{ padding: '9px 0', borderBottom: '0.5px solid var(--border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontWeight: 500, fontSize: 13 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <Icon name="file-text" size={16} color="var(--primary)" />
+            <span style={{ fontSize: 13, fontWeight: 600 }}>Entradas recentes</span>
+          </div>
+          {movs.length === 0 ? (
+            <div className="empty-state">
+              <Icon name="arrow-down" size={28} color="var(--text-3)" style={{ margin: '0 auto 8px' }} />
+              <div className="empty-state-title">Sem entradas recentes</div>
+            </div>
+          ) : movs.map((m) => (
+            <div key={m.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                <span style={{ fontWeight: 600, fontSize: 13 }}>
                   {m.itens.map((mi: any) => mi.item.nome).join(', ')}
                 </span>
-                <span style={{ fontSize: 12, color: 'var(--g600)', fontWeight: 500 }}>
+                <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600, flexShrink: 0 }}>
                   +{m.itens.reduce((s: number, mi: any) => s + Number(mi.quantidade), 0)} un
                 </span>
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text2)' }}>
-                {m.doador?.nome || 'Avulsa'} · {fmtData(m.dataMovimentacao)} · {m.usuario.nome}
+              <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2 }}>
+                {m.doador?.nome || 'Doação avulsa'} · {fmtData(m.dataMovimentacao)} · {m.usuario.nome}
               </div>
             </div>
           ))}
-          {movs.length === 0 && <div style={{ fontSize: 13, color: 'var(--text2)' }}>Nenhuma entrada registrada.</div>}
+
+          <div style={{
+            marginTop: 16, padding: 12,
+            background: 'var(--primary-bg)', borderRadius: 8,
+            display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <Icon name="bell" size={16} color="var(--primary-dk)" />
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-2)' }}>Próximo resumo</div>
+              <div style={{ fontSize: 12, fontWeight: 600 }}>Sábado às 08h00</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -154,7 +217,7 @@ export default function Entradas() {
         <Scanner
           onClose={() => setShowScanner(false)}
           onItemEncontrado={(i) => adicionarItem(i)}
-          onCadastroManual={(ean) => { alert(`EAN ${ean} não cadastrado. Vá em Itens para cadastrar.`); }}
+          onCadastroManual={(ean) => alert(`Código ${ean} não cadastrado. Vá em "Itens" para cadastrar.`)}
         />
       )}
     </div>

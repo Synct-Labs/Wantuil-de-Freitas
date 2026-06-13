@@ -12,6 +12,7 @@ import { MovimentacoesModule } from './movimentacoes/movimentacoes.module';
 import { EtiquetasModule } from './etiquetas/etiquetas.module';
 import { RelatoriosModule } from './relatorios/relatorios.module';
 import { NotificacoesModule } from './notificacoes/notificacoes.module';
+import { ProdutosExternosModule } from './produtos-externos/produtos-externos.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { NotificacoesModule } from './notificacoes/notificacoes.module';
     EtiquetasModule,
     RelatoriosModule,
     NotificacoesModule,
+    ProdutosExternosModule,
   ],
 })
 export class AppModule {}
