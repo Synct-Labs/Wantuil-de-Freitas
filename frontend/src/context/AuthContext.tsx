@@ -7,9 +7,38 @@ interface AuthCtx {
   usuario: Usuario | null;
   login: (email: string, senha: string) => Promise<void>;
   logout: () => void;
+  podeFazer: (acao: string) => boolean;
 }
 
 const Ctx = createContext<AuthCtx>(null!);
+
+// Matriz de permissoes — deve espelhar o backend (PerfilGuard + @Perfis)
+const PERMISSOES: Record<string, string[]> = {
+  // Itens
+  'itens.criar':        ['ADMIN', 'ALMOXARIFE'],
+  'itens.editar':       ['ADMIN', 'ALMOXARIFE'],
+  'itens.excluir':      ['ADMIN'],
+  // Movimentacoes
+  'mov.entrada':        ['ADMIN', 'ALMOXARIFE'],
+  'mov.saida':          ['ADMIN', 'ALMOXARIFE'],
+  'mov.descarte':       ['ADMIN', 'ALMOXARIFE'],
+  'mov.estorno':        ['ADMIN'],
+  // Cadastros
+  'doadores.criar':     ['ADMIN', 'ALMOXARIFE', 'OPERADOR'],
+  'doadores.editar':    ['ADMIN', 'ALMOXARIFE', 'OPERADOR'],
+  'doadores.excluir':   ['ADMIN'],
+  'benef.criar':        ['ADMIN', 'ALMOXARIFE', 'OPERADOR'],
+  'benef.editar':       ['ADMIN', 'ALMOXARIFE', 'OPERADOR'],
+  'benef.excluir':      ['ADMIN'],
+  // Estrutura
+  'setores.gerenciar':  ['ADMIN'],
+  'categorias.gerenciar':['ADMIN'],
+  'usuarios.gerenciar': ['ADMIN'],
+  // Visao
+  'relatorios.ver':     ['ADMIN', 'ALMOXARIFE', 'GESTOR'],
+  'auditoria.ver':      ['ADMIN'],
+  'configuracoes':      ['ADMIN'],
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<Usuario | null>(() => {
@@ -18,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   async function login(email: string, senha: string) {
-    const { data } = await api.post('/auth/login', { email, senha });
+    const { data } = await api.post('/auth/login', { email: email.trim().toLowerCase(), senha });
     localStorage.setItem('token', data.token);
     localStorage.setItem('usuario', JSON.stringify(data.usuario));
     setUsuario(data.usuario);
@@ -30,7 +59,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUsuario(null);
   }
 
-  return <Ctx.Provider value={{ usuario, login, logout }}>{children}</Ctx.Provider>;
+  function podeFazer(acao: string): boolean {
+    if (!usuario) return false;
+    const perfisPermitidos = PERMISSOES[acao];
+    if (!perfisPermitidos) return false;
+    return perfisPermitidos.includes(usuario.perfil);
+  }
+
+  return <Ctx.Provider value={{ usuario, login, logout, podeFazer }}>{children}</Ctx.Provider>;
 }
 
 export const useAuth = () => useContext(Ctx);

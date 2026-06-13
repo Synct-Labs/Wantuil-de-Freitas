@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import api from '../api/client';
-import { fmtCpfCnpj, fmtData } from '../utils/format';
+import { fmtCpfCnpj } from '../utils/format';
+import { excluirComConfirmacao } from '../utils/confirm';
+import { useAuth } from '../context/AuthContext';
 
 export default function Beneficiarios() {
+  const { podeFazer } = useAuth();
   const [lista, setLista] = useState<any[]>([]);
   const [busca, setBusca] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -16,11 +19,21 @@ export default function Beneficiarios() {
     carregar();
   }
 
+  async function excluir(b: any) {
+    const ok = await excluirComConfirmacao({
+      url: `/beneficiarios/${b.id}`,
+      pergunta: `Excluir "${b.nome}"?\n\nObservação: se já recebeu doações, será desativado em vez de excluído.`,
+    });
+    if (ok) carregar();
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h2 style={{ fontSize: 16 }}>Beneficiários</h2>
-        <button className="btn primary" onClick={() => { setEditando(null); setShowForm(true); }}>+ Novo beneficiário</button>
+        {podeFazer('benef.criar') && (
+          <button className="btn primary" onClick={() => { setEditando(null); setShowForm(true); }}>+ Novo beneficiário</button>
+        )}
       </div>
 
       <input className="input" placeholder="Buscar por nome ou CPF..." value={busca}
@@ -28,7 +41,7 @@ export default function Beneficiarios() {
 
       <div className="card">
         <table className="table">
-          <thead><tr><th>Nome</th><th>CPF</th><th>Telefone</th><th>Bairro</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Nome</th><th>CPF</th><th>Telefone</th><th>Bairro</th><th>Status</th><th>Ações</th></tr></thead>
           <tbody>
             {lista.map((b) => (
               <tr key={b.id}>
@@ -38,10 +51,19 @@ export default function Beneficiarios() {
                 <td>{b.bairro || '—'}</td>
                 <td><span className={`pill ${b.ativo ? 'green' : 'red'}`}>{b.ativo ? 'Ativo' : 'Inativo'}</span></td>
                 <td>
-                  <button className="btn sm" onClick={() => { setEditando(b); setShowForm(true); }}>✏️</button>
-                  <button className="btn sm" onClick={() => alternarStatus(b)} style={{ marginLeft: 4 }}>
-                    {b.ativo ? '🚫' : '✓'}
-                  </button>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {podeFazer('benef.editar') && (
+                      <button className="btn sm" onClick={() => { setEditando(b); setShowForm(true); }} title="Editar">✏️</button>
+                    )}
+                    {podeFazer('benef.editar') && (
+                      <button className="btn sm" onClick={() => alternarStatus(b)} title={b.ativo ? 'Desativar' : 'Reativar'}>
+                        {b.ativo ? '🚫' : '✓'}
+                      </button>
+                    )}
+                    {podeFazer('benef.excluir') && (
+                      <button className="btn sm" style={{ color: 'var(--r600)' }} onClick={() => excluir(b)} title="Excluir">🗑️</button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

@@ -1,23 +1,22 @@
 import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { JwtGuard } from '../auth/jwt.guard';
+import { PerfilGuard } from '../common/perfil.guard';
+import { Perfis } from '../common/perfil.decorator';
 import { RelatoriosService } from './relatorios.service';
 
 @Controller('relatorios')
-@UseGuards(JwtGuard)
+@UseGuards(JwtGuard, PerfilGuard)
+@Perfis('ADMIN', 'ALMOXARIFE', 'GESTOR')
 export class RelatoriosController {
   constructor(private service: RelatoriosService) {}
 
   @Get('estoque')
-  estoque(@Query('setorId') setorId?: string) {
-    return this.service.posicaoEstoque(setorId);
-  }
+  estoque(@Query('setorId') setorId?: string) { return this.service.posicaoEstoque(setorId); }
 
   @Get('movimentacoes')
-  movs(
-    @Query('dataInicio') di: string, @Query('dataFim') df: string,
-    @Query('setorId') setorId?: string, @Query('tipo') tipo?: string,
-  ) {
+  movs(@Query('dataInicio') di: string, @Query('dataFim') df: string,
+    @Query('setorId') setorId?: string, @Query('tipo') tipo?: string) {
     return this.service.movimentacoes(di, df, setorId, tipo);
   }
 
@@ -31,7 +30,7 @@ export class RelatoriosController {
     return this.service.distribuicaoPorBeneficiario(di, df);
   }
 
-  @Get('auditoria')
+  @Get('auditoria') @Perfis('ADMIN')
   auditoria(@Query('dataInicio') di: string, @Query('dataFim') df: string) {
     return this.service.logAuditoria(di, df);
   }
@@ -47,10 +46,7 @@ export class RelatoriosController {
   }
 
   @Get('movimentacoes/excel')
-  async movsExcel(
-    @Res() res: Response,
-    @Query('dataInicio') di: string, @Query('dataFim') df: string, @Query('setorId') setorId?: string,
-  ) {
+  async movsExcel(@Res() res: Response, @Query('dataInicio') di: string, @Query('dataFim') df: string, @Query('setorId') setorId?: string) {
     const buf = await this.service.excelMovimentacoes(di, df, setorId);
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

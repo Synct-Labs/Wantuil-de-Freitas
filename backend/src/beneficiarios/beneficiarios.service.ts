@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { validarCpf } from '../doadores/doadores.service';
 
@@ -14,7 +14,11 @@ export class BeneficiariosService {
         { cpf: { contains: busca.replace(/\D/g, '') } },
       ];
     }
-    return this.prisma.beneficiario.findMany({ where, orderBy: { nome: 'asc' } });
+    return this.prisma.beneficiario.findMany({
+      where,
+      include: { _count: { select: { movimentacoes: true } } },
+      orderBy: { nome: 'asc' },
+    });
   }
 
   historico(id: string) {
@@ -38,5 +42,21 @@ export class BeneficiariosService {
     delete data.cpf;
     if (data.dataNascimento) data.dataNascimento = new Date(data.dataNascimento);
     return this.prisma.beneficiario.update({ where: { id }, data });
+  }
+
+  async excluir(id: string) {
+    const b = await this.prisma.beneficiario.findUnique({
+      where: { id },
+      include: { _count: { select: { movimentacoes: true } } },
+    });
+    if (!b) throw new NotFoundException('Beneficiario nao encontrado');
+
+    if (b._count.movimentacoes > 0) {
+      await this.prisma.beneficiario.update({ where: { id }, data: { ativo: false } });
+      return { mensagem: 'Beneficiario possui historico e foi desativado em vez de excluido', desativado: true };
+    }
+
+    await this.prisma.beneficiario.delete({ where: { id } });
+    return { mensagem: 'Beneficiario excluido permanentemente', excluido: true };
   }
 }

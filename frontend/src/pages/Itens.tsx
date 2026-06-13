@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react';
 import api from '../api/client';
 import Scanner from '../components/Scanner';
 import { fmtData, STATUS_VALIDADE } from '../utils/format';
+import { excluirComConfirmacao } from '../utils/confirm';
+import { useAuth } from '../context/AuthContext';
 
 export default function Itens() {
+  const { podeFazer } = useAuth();
   const [itens, setItens] = useState<any[]>([]);
   const [categorias, setCategorias] = useState<any[]>([]);
   const [setores, setSetores] = useState<any[]>([]);
@@ -15,8 +18,11 @@ export default function Itens() {
   const [eanPre, setEanPre] = useState('');
   const [nomePre, setNomePre] = useState('');
 
-  useEffect(() => { carregar(); api.get('/categorias').then((r) => setCategorias(r.data));
-    api.get('/setores').then((r) => setSetores(r.data)); }, []);
+  useEffect(() => {
+    carregar();
+    api.get('/categorias').then((r) => setCategorias(r.data));
+    api.get('/setores').then((r) => setSetores(r.data));
+  }, []);
   useEffect(() => { const t = setTimeout(carregar, 250); return () => clearTimeout(t); }, [busca, filtroCategoria]);
 
   function carregar() {
@@ -26,18 +32,21 @@ export default function Itens() {
     api.get('/itens', { params }).then((r) => setItens(r.data));
   }
 
-  function abrirNovo() { setEditando(null); setEanPre(''); setNomePre(''); setShowForm(true); }
-  function editar(item: any) { setEditando(item); setShowForm(true); }
   function imprimirEtiqueta(item: any) {
     const qtd = prompt('Quantas etiquetas imprimir?', '1');
     if (!qtd) return;
     const token = localStorage.getItem('token');
     fetch(`${import.meta.env.VITE_API_URL || '/api'}/etiquetas/${item.id}?qtd=${qtd}`, {
       headers: { Authorization: `Bearer ${token}` },
-    }).then((r) => r.blob()).then((b) => {
-      const url = URL.createObjectURL(b);
-      window.open(url, '_blank');
+    }).then((r) => r.blob()).then((b) => window.open(URL.createObjectURL(b), '_blank'));
+  }
+
+  async function excluir(item: any) {
+    const ok = await excluirComConfirmacao({
+      url: `/itens/${item.id}`,
+      pergunta: `Excluir "${item.nome}"?\n\nObservação: se o item já tiver movimentações, ele será desativado em vez de excluído (para preservar o histórico).`,
     });
+    if (ok) carregar();
   }
 
   return (
@@ -45,14 +54,14 @@ export default function Itens() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h2 style={{ fontSize: 16 }}>Itens</h2>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn" onClick={() => setShowScanner(true)}>📷 Ler código de barras</button>
-          <button className="btn primary" onClick={abrirNovo}>+ Novo item</button>
+          {podeFazer('itens.criar') && <button className="btn" onClick={() => setShowScanner(true)}>📷 Ler código de barras</button>}
+          {podeFazer('itens.criar') && <button className="btn primary" onClick={() => { setEditando(null); setEanPre(''); setNomePre(''); setShowForm(true); }}>+ Novo item</button>}
         </div>
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        <input className="input" placeholder="Buscar por nome, código ou EAN..."
-          value={busca} onChange={(e) => setBusca(e.target.value)} style={{ maxWidth: 320 }} />
+        <input className="input" placeholder="Buscar por nome, código ou EAN..." value={busca}
+          onChange={(e) => setBusca(e.target.value)} style={{ maxWidth: 320 }} />
         <select className="input" value={filtroCategoria} onChange={(e) => setFiltroCategoria(e.target.value)} style={{ maxWidth: 180 }}>
           <option value="">Todas categorias</option>
           {categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
@@ -64,7 +73,7 @@ export default function Itens() {
           <thead>
             <tr>
               <th>Código</th><th>EAN</th><th>Item</th><th>Setor</th><th>Saldo</th><th>Mín.</th>
-              <th>Validade</th><th>Status</th><th></th>
+              <th>Validade</th><th>Status</th><th>Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -87,7 +96,12 @@ export default function Itens() {
                 <td>
                   <div style={{ display: 'flex', gap: 4 }}>
                     <button className="btn sm" onClick={() => imprimirEtiqueta(i)} title="Imprimir etiqueta">🏷️</button>
-                    <button className="btn sm" onClick={() => editar(i)} title="Editar">✏️</button>
+                    {podeFazer('itens.editar') && (
+                      <button className="btn sm" onClick={() => { setEditando(i); setShowForm(true); }} title="Editar">✏️</button>
+                    )}
+                    {podeFazer('itens.excluir') && (
+                      <button className="btn sm" style={{ color: 'var(--r600)' }} onClick={() => excluir(i)} title="Excluir">🗑️</button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -106,15 +120,10 @@ export default function Itens() {
       )}
 
       {showForm && (
-        <FormItem
-          item={editando}
-          eanInicial={eanPre}
-          nomeInicial={nomePre}
-          categorias={categorias}
-          setores={setores}
+        <FormItem item={editando} eanInicial={eanPre} nomeInicial={nomePre}
+          categorias={categorias} setores={setores}
           onClose={() => setShowForm(false)}
-          onSave={() => { setShowForm(false); carregar(); }}
-        />
+          onSave={() => { setShowForm(false); carregar(); }} />
       )}
     </div>
   );

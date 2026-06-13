@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 export function calcularStatusValidade(dataValidade: Date | null): string {
@@ -90,7 +90,30 @@ export class ItensService {
   }
 
   async desativar(id: string) {
+    const item = await this.prisma.item.findUnique({ where: { id } });
+    if (!item) throw new NotFoundException('Item nao encontrado');
     return this.prisma.item.update({ where: { id }, data: { ativo: false } });
+  }
+
+  async excluir(id: string) {
+    const item = await this.prisma.item.findUnique({
+      where: { id },
+      include: { _count: { select: { movimentacaoItens: true } } },
+    });
+    if (!item) throw new NotFoundException('Item nao encontrado');
+
+    // Se tem historico de movimentacao, apenas desativa (preserva integridade)
+    if (item._count.movimentacaoItens > 0) {
+      await this.prisma.item.update({ where: { id }, data: { ativo: false } });
+      return {
+        mensagem: 'Item possui historico de movimentacoes e foi desativado. Ele nao aparecera mais nas listagens, mas o historico fica preservado.',
+        desativado: true,
+      };
+    }
+
+    // Sem historico: exclusao definitiva
+    await this.prisma.item.delete({ where: { id } });
+    return { mensagem: 'Item excluido permanentemente', excluido: true };
   }
 
   async alertas() {

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { JwtGuard } from '../auth/jwt.guard';
 import { PerfilGuard } from '../common/perfil.guard';
 import { Perfis } from '../common/perfil.decorator';
@@ -9,9 +9,33 @@ import { UsersService } from './users.service';
 export class UsersController {
   constructor(private service: UsersService) {}
 
-  @Get() @Perfis('ADMIN') findAll() { return this.service.findAll(); }
-  @Post() @Perfis('ADMIN') create(@Body() dto: any) { return this.service.create(dto); }
-  @Patch(':id') @Perfis('ADMIN') update(@Param('id') id: string, @Body() dto: any) {
+  @Get()
+  @Perfis('ADMIN')
+  findAll() { return this.service.findAll(); }
+
+  @Get(':id')
+  @Perfis('ADMIN')
+  findOne(@Param('id') id: string) { return this.service.findOne(id); }
+
+  @Post()
+  @Perfis('ADMIN')
+  create(@Body() dto: any) { return this.service.create(dto); }
+
+  @Patch(':id')
+  @Perfis('ADMIN')
+  update(@Param('id') id: string, @Body() dto: any) {
     return this.service.update(id, dto);
+  }
+
+  @Delete(':id')
+  @Perfis('ADMIN')
+  excluir(@Param('id') id: string, @Req() req: any) {
+    return this.service.excluir(id, req.user.id);
+  }
+
+  @Patch(':id/desativar')
+  @Perfis('ADMIN')
+  desativar(@Param('id') id: string, @Req() req: any) {
+    return this.service.desativar(id, req.user.id);
   }
 }

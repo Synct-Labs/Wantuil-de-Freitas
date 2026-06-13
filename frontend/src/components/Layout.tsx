@@ -5,8 +5,8 @@ const NAV = [
   { grupo: 'Principal', links: [
     { to: '/', label: 'Dashboard', icon: '🏠' },
     { to: '/itens', label: 'Itens', icon: '📦' },
-    { to: '/entradas', label: 'Entradas', icon: '↓' },
-    { to: '/saidas', label: 'Saídas', icon: '↑' },
+    { to: '/entradas', label: 'Entradas', icon: '↓', requer: 'mov.entrada' },
+    { to: '/saidas', label: 'Saídas', icon: '↑', requer: 'mov.saida' },
   ]},
   { grupo: 'Controle', links: [
     { to: '/validade', label: 'Validade', icon: '⏰' },
@@ -17,13 +17,18 @@ const NAV = [
     { to: '/beneficiarios', label: 'Beneficiários', icon: '👥' },
   ]},
   { grupo: 'Análise', links: [
-    { to: '/relatorios', label: 'Relatórios', icon: '📊' },
+    { to: '/relatorios', label: 'Relatórios', icon: '📊', requer: 'relatorios.ver' },
   ]},
 ];
 
 export default function Layout() {
-  const { usuario, logout } = useAuth();
+  const { usuario, logout, podeFazer } = useAuth();
   const loc = useLocation();
+
+  // Filtra cada grupo, removendo links sem permissao e grupos vazios
+  const navFiltrado = NAV
+    .map((g) => ({ ...g, links: g.links.filter((l: any) => !l.requer || podeFazer(l.requer)) }))
+    .filter((g) => g.links.length > 0);
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
@@ -35,7 +40,7 @@ export default function Layout() {
           <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 2 }}>Gestão de Almoxarifado</div>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {NAV.map((g) => (
+          {navFiltrado.map((g) => (
             <div key={g.grupo}>
               <div style={{ padding: '10px 0 4px 14px', fontSize: 10, fontWeight: 500,
                 color: 'rgba(255,255,255,0.3)', letterSpacing: '.08em', textTransform: 'uppercase' }}>{g.grupo}</div>
@@ -57,13 +62,19 @@ export default function Layout() {
           ))}
         </div>
         <div style={{ padding: '8px 0', borderTop: '0.5px solid rgba(255,255,255,0.08)' }}>
-          <NavLink to="/configuracoes" style={{ display: 'flex', alignItems: 'center', gap: 9,
-            padding: '8px 14px', fontSize: 13, color: 'rgba(255,255,255,0.5)', textDecoration: 'none' }}>
-            ⚙️ Configurações
-          </NavLink>
+          <div style={{ padding: '6px 14px', fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
+            <div>{usuario?.nome}</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>{usuario?.perfil}</div>
+          </div>
+          {podeFazer('configuracoes') && (
+            <NavLink to="/configuracoes" style={{ display: 'flex', alignItems: 'center', gap: 9,
+              padding: '8px 14px', fontSize: 13, color: 'rgba(255,255,255,0.5)', textDecoration: 'none' }}>
+              ⚙️ Configurações
+            </NavLink>
+          )}
           <button onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%',
-            padding: '8px 14px', fontSize: 13, color: 'rgba(255,255,255,0.5)', background: 'none', border: 'none' }}>
-            🚪 Sair ({usuario?.nome?.split(' ')[0]})
+            padding: '8px 14px', fontSize: 13, color: 'rgba(255,255,255,0.5)', background: 'none', border: 'none', textAlign: 'left' }}>
+            🚪 Sair
           </button>
         </div>
       </nav>

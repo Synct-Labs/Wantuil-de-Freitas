@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 function limparDoc(doc: string) { return (doc || '').replace(/\D/g, ''); }
@@ -52,7 +52,7 @@ export class DoadoresService {
     });
   }
 
-  async historico(id: string) {
+  historico(id: string) {
     return this.prisma.movimentacao.findMany({
       where: { doadorId: id },
       include: { itens: { include: { item: true } } },
@@ -72,7 +72,23 @@ export class DoadoresService {
   }
 
   update(id: string, data: any) {
-    delete data.cpfCnpj; // documento nao pode ser alterado
+    delete data.cpfCnpj;
     return this.prisma.doador.update({ where: { id }, data });
+  }
+
+  async excluir(id: string) {
+    const d = await this.prisma.doador.findUnique({
+      where: { id },
+      include: { _count: { select: { movimentacoes: true } } },
+    });
+    if (!d) throw new NotFoundException('Doador nao encontrado');
+
+    if (d._count.movimentacoes > 0) {
+      await this.prisma.doador.update({ where: { id }, data: { ativo: false } });
+      return { mensagem: 'Doador possui historico e foi desativado em vez de excluido', desativado: true };
+    }
+
+    await this.prisma.doador.delete({ where: { id } });
+    return { mensagem: 'Doador excluido permanentemente', excluido: true };
   }
 }

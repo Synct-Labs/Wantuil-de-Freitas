@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import api from '../api/client';
-import { fmtCpfCnpj, fmtData } from '../utils/format';
+import { fmtCpfCnpj } from '../utils/format';
+import { excluirComConfirmacao } from '../utils/confirm';
+import { useAuth } from '../context/AuthContext';
 
 export default function Doadores() {
+  const { podeFazer } = useAuth();
   const [lista, setLista] = useState<any[]>([]);
   const [busca, setBusca] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -11,11 +14,21 @@ export default function Doadores() {
   useEffect(() => { const t = setTimeout(carregar, 250); return () => clearTimeout(t); }, [busca]);
   function carregar() { api.get('/doadores', { params: { busca } }).then((r) => setLista(r.data)); }
 
+  async function excluir(d: any) {
+    const ok = await excluirComConfirmacao({
+      url: `/doadores/${d.id}`,
+      pergunta: `Excluir "${d.nome}"?\n\nObservação: se tiver doações registradas, será desativado em vez de excluído.`,
+    });
+    if (ok) carregar();
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h2 style={{ fontSize: 16 }}>Doadores</h2>
-        <button className="btn primary" onClick={() => { setEditando(null); setShowForm(true); }}>+ Novo doador</button>
+        {podeFazer('doadores.criar') && (
+          <button className="btn primary" onClick={() => { setEditando(null); setShowForm(true); }}>+ Novo doador</button>
+        )}
       </div>
 
       <input className="input" placeholder="Buscar por nome ou CPF/CNPJ..." value={busca}
@@ -23,7 +36,7 @@ export default function Doadores() {
 
       <div className="card">
         <table className="table">
-          <thead><tr><th>Nome</th><th>Tipo</th><th>CPF/CNPJ</th><th>Telefone</th><th>Doações</th><th></th></tr></thead>
+          <thead><tr><th>Nome</th><th>Tipo</th><th>CPF/CNPJ</th><th>Telefone</th><th>Doações</th><th>Ações</th></tr></thead>
           <tbody>
             {lista.map((d) => (
               <tr key={d.id}>
@@ -32,7 +45,16 @@ export default function Doadores() {
                 <td style={{ fontSize: 12, color: 'var(--text2)' }}>{fmtCpfCnpj(d.cpfCnpj)}</td>
                 <td style={{ fontSize: 12 }}>{d.telefone || '—'}</td>
                 <td style={{ fontWeight: 500, color: 'var(--g600)' }}>{d._count?.movimentacoes || 0}</td>
-                <td><button className="btn sm" onClick={() => { setEditando(d); setShowForm(true); }}>✏️</button></td>
+                <td>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {podeFazer('doadores.editar') && (
+                      <button className="btn sm" onClick={() => { setEditando(d); setShowForm(true); }} title="Editar">✏️</button>
+                    )}
+                    {podeFazer('doadores.excluir') && (
+                      <button className="btn sm" style={{ color: 'var(--r600)' }} onClick={() => excluir(d)} title="Excluir">🗑️</button>
+                    )}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>

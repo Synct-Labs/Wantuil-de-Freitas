@@ -1,0 +1,85 @@
+{
+  "name": "almoxarifado-wantuil-desktop",
+  "productName": "Almoxarifado Wantuil",
+  "version": "1.0.0",
+  "description": "Sistema de Gestão de Almoxarifado - Versão Desktop Offline",
+  "main": "src/main.js",
+  "author": "Instituição Wantuil de Freitas",
+  "scripts": {
+    "preparar": "node scripts/preparar.js",
+    "start": "electron .",
+    "build:win": "electron-builder --win --x64",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux AppImage",
+    "build:all": "electron-builder -mwl"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.8.0",
+    "electron-is-dev": "^2.0.0",
+    "electron-log": "^5.0.3"
+  },
+  "devDependencies": {
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
+    "prisma": "^5.8.0"
+  },
+  "build": {
+    "appId": "br.org.wantuil.almoxarifado",
+    "productName": "Almoxarifado Wantuil",
+    "directories": {
+      "output": "dist-installers",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "node_modules/**/*",
+      "resources/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/backend",
+        "to": "backend",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "resources/frontend-dist",
+        "to": "frontend",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "resources/prisma",
+        "to": "prisma",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "build/icon.icns",
+      "category": "public.app-category.business"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "build/icon.png",
+      "category": "Office"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Almoxarifado Wantuil",
+      "installerLanguages": ["pt_BR"],
+      "language": "1046"
+    }
+  }
+}

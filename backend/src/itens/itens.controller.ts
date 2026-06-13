@@ -26,6 +26,9 @@ export class ItensController {
   @Patch(':id') @Perfis('ADMIN', 'ALMOXARIFE')
   update(@Param('id') id: string, @Body() dto: any) { return this.service.update(id, dto); }
 
-  @Delete(':id') @Perfis('ADMIN')
+  @Patch(':id/desativar') @Perfis('ADMIN', 'ALMOXARIFE')
   desativar(@Param('id') id: string) { return this.service.desativar(id); }
+
+  @Delete(':id') @Perfis('ADMIN')
+  excluir(@Param('id') id: string) { return this.service.excluir(id); }
 }
