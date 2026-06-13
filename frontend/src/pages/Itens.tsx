@@ -174,11 +174,9 @@ function FormItem({ item, eanInicial, nomeInicial, categoriaSugerida, categorias
     codigoEan: item?.codigoEan || eanInicial || '',
     nome: item?.nome || nomeInicial || '',
     descricao: item?.descricao || '',
-    unidadeMedida: item?.unidadeMedida || '',
     estoqueMinimo: item?.estoqueMinimo || 0,
     categoriaId: categoriaIdInicial,
     setorId: item?.setorId || '',
-    localizacao: item?.localizacao || '',
   });
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
@@ -186,16 +184,15 @@ function FormItem({ item, eanInicial, nomeInicial, categoriaSugerida, categorias
   async function salvar(e: React.FormEvent) {
     e.preventDefault(); setErro(''); setSalvando(true);
     try {
-      // Monta payload limpo: setor preservado se ja existia (edicao), default 'un' para unidade
+      // Monta payload limpo: unidade fixa em 'un' (padrao), sem localizacao no form
       const payload = {
         codigoEan: form.codigoEan?.trim() || undefined,
         nome: form.nome.trim(),
         descricao: form.descricao?.trim() || undefined,
-        unidadeMedida: form.unidadeMedida?.trim() || 'un',
+        unidadeMedida: 'un',
         estoqueMinimo: Number(form.estoqueMinimo) || 0,
         categoriaId: form.categoriaId,
         setorId: form.setorId || undefined,
-        localizacao: form.localizacao?.trim() || undefined,
       };
 
       if (item) await api.patch(`/itens/${item.id}`, payload);
@@ -245,40 +242,13 @@ function FormItem({ item, eanInicial, nomeInicial, categoriaSugerida, categorias
           {categorias.map((c: any) => <option key={c.id} value={c.id}>{c.nome}</option>)}
         </select>
 
-        <div className="grid-2" style={{ marginBottom: 4 }}>
-          <div>
-            <label className="label">Unidade de medida</label>
-            <select className="select" value={form.unidadeMedida || 'un'}
-              onChange={(e) => setForm({ ...form, unidadeMedida: e.target.value })}>
-              <option value="un">un — unidade (cada item inteiro)</option>
-              <option value="kg">kg — quilograma</option>
-              <option value="g">g — grama</option>
-              <option value="L">L — litro</option>
-              <option value="ml">ml — mililitro</option>
-              <option value="pct">pct — pacote</option>
-              <option value="cx">cx — caixa</option>
-              <option value="fd">fd — fardo</option>
-              <option value="par">par</option>
-              <option value="rolo">rolo</option>
-              <option value="dz">dz — dúzia</option>
-            </select>
-          </div>
-          <div>
-            <label className="label">Estoque mínimo</label>
-            <input className="input" type="number" min="0" value={form.estoqueMinimo}
-              onChange={(e) => setForm({ ...form, estoqueMinimo: parseFloat(e.target.value) || 0 })}
-              placeholder="0" />
-          </div>
+        <label className="label">Estoque mínimo</label>
+        <input className="input" type="number" min="0" value={form.estoqueMinimo}
+          onChange={(e) => setForm({ ...form, estoqueMinimo: parseFloat(e.target.value) || 0 })}
+          placeholder="0" />
+        <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 14, marginTop: 4, lineHeight: 1.4 }}>
+          Dispara alerta quando o saldo cai a esse valor. Deixe 0 se não quiser alerta.
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 14, marginTop: 2, lineHeight: 1.4 }}>
-          A unidade define como o saldo será exibido (ex: "12 un" ou "30 kg"). O estoque
-          mínimo dispara alerta quando o saldo cai a esse valor — deixe 0 se não quiser alerta.
-        </div>
-
-        <label className="label">Localização física</label>
-        <input className="input" value={form.localizacao}
-          onChange={(e) => setForm({ ...form, localizacao: e.target.value })}
-          placeholder="Ex: Prateleira A-3" style={{ marginBottom: 12 }} />
 
         <label className="label">Descrição</label>
         <textarea className="input" rows={2} value={form.descricao}
