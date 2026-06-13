@@ -15,5 +15,16 @@
     "strictNullChecks": false,
     "noImplicitAny": false,
     "esModuleInterop": true
-  }
+  },
+  "include": ["src/**/*", "prisma/seed.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "test",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "../frontend",
+    "../desktop",
+    "../docs"
+  ]
 }
