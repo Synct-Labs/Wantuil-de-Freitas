@@ -64,6 +64,25 @@ export class ItensService {
     return { encontrado: true, item: { ...item, statusValidade: calcularStatusValidade(item.dataValidade) } };
   }
 
+  /**
+   * Gera o proximo codigo interno disponivel no formato WF-NNNNN.
+   * Busca o maior numero ja usado (em vez de count) para evitar colisao
+   * quando itens sao excluidos permanentemente.
+   */
+  private async gerarProximoCodigoInterno(): Promise<string> {
+    const ultimo = await this.prisma.item.findFirst({
+      where: { codigoInterno: { startsWith: 'WF-' } },
+      orderBy: { codigoInterno: 'desc' },
+      select: { codigoInterno: true },
+    });
+    let proximo = 1;
+    if (ultimo) {
+      const match = ultimo.codigoInterno.match(/WF-(\d+)/);
+      if (match) proximo = parseInt(match[1], 10) + 1;
+    }
+    return `WF-${String(proximo).padStart(5, '0')}`;
+  }
+
   async create(data: any) {
     try {
       // ─── Validacoes ────────────────────────────────────────────
@@ -93,41 +112,50 @@ export class ItensService {
         if (existe) throw new ConflictException(`Codigo de barras ja cadastrado para: ${existe.nome}`);
       }
 
-      // Gera codigo interno sequencial
-      const count = await this.prisma.item.count();
-      const codigoInterno = (data.codigoInterno || '').trim() || `WF-${String(count + 1).padStart(5, '0')}`;
-
-      // Normalizacao de tipos para evitar surpresas no Prisma
+      // Normalizacao de tipos
       const estoqueMinimo = Number(data.estoqueMinimo);
       const estoqueValido = Number.isFinite(estoqueMinimo) && estoqueMinimo >= 0 ? estoqueMinimo : 0;
 
-      // ─── Persistencia ──────────────────────────────────────────
-      const criado = await this.prisma.item.create({
-        data: {
-          codigoInterno,
-          codigoEan: eanLimpo || null,
-          nome,
-          descricao: data.descricao?.trim() || null,
-          unidadeMedida: (data.unidadeMedida || '').trim() || 'un',
-          estoqueMinimo: estoqueValido,
-          dataValidade: data.dataValidade ? new Date(data.dataValidade) : null,
-          localizacao: data.localizacao?.trim() || null,
-          categoriaId: data.categoriaId,
-          setorId: setorIdValido,
-        },
-        include: { categoria: true, setor: true },
-      });
-
-      this.logger.log(`Item criado: ${criado.codigoInterno} - ${criado.nome}`);
-      return criado;
+      // ─── Persistencia com retry em caso de colisao de codigo interno ───
+      // Se houver corrida (criacao simultanea) ou estado bugado, tenta novamente.
+      let tentativas = 0;
+      const codigoExplicito = (data.codigoInterno || '').trim();
+      while (true) {
+        const codigoInterno = codigoExplicito || await this.gerarProximoCodigoInterno();
+        try {
+          const criado = await this.prisma.item.create({
+            data: {
+              codigoInterno,
+              codigoEan: eanLimpo || null,
+              nome,
+              descricao: data.descricao?.trim() || null,
+              unidadeMedida: (data.unidadeMedida || '').trim() || 'un',
+              estoqueMinimo: estoqueValido,
+              dataValidade: data.dataValidade ? new Date(data.dataValidade) : null,
+              localizacao: data.localizacao?.trim() || null,
+              categoriaId: data.categoriaId,
+              setorId: setorIdValido,
+            },
+            include: { categoria: true, setor: true },
+          });
+          this.logger.log(`Item criado: ${criado.codigoInterno} - ${criado.nome}`);
+          return criado;
+        } catch (e: any) {
+          // P2002 = unique constraint violation. Se foi no codigo_interno, recalcula e tenta de novo.
+          const colisaoCodigoInterno = e?.code === 'P2002'
+            && Array.isArray(e?.meta?.target)
+            && e.meta.target.includes('codigo_interno');
+          if (colisaoCodigoInterno && !codigoExplicito && tentativas < 5) {
+            tentativas++;
+            this.logger.warn(`Colisao em codigo_interno, tentativa ${tentativas}/5`);
+            continue;
+          }
+          throw e;
+        }
+      }
     } catch (err: any) {
-      // Re-lanca excecoes HTTP (BadRequest, Conflict, etc.) sem reempacotar
       if (err instanceof HttpException) throw err;
-
-      // Loga erro tecnico completo (visivel nos logs do Render)
       this.logger.error(`Falha ao criar item: ${err.message}`, err.stack);
-
-      // Erros conhecidos do Prisma viram mensagens amigaveis
       if (err.code === 'P2002') {
         const campo = Array.isArray(err.meta?.target) ? err.meta.target.join(', ') : 'campo';
         throw new ConflictException(`Ja existe um item com este ${campo}`);
@@ -138,8 +166,6 @@ export class ItensService {
       if (err.code === 'P2025') {
         throw new BadRequestException('Registro relacionado nao encontrado');
       }
-
-      // Erro generico — exibe pelo menos a mensagem original em vez de "Internal server error"
       throw new BadRequestException(`Nao foi possivel cadastrar: ${err.message || 'erro desconhecido'}`);
     }
   }
