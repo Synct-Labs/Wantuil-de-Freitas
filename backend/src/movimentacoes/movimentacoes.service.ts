@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
-interface ItemMov { itemId: string; quantidade: number; dataValidade?: string }
+export interface ItemMov { itemId: string; quantidade: number; dataValidade?: string }
 
 @Injectable()
 export class MovimentacoesService {

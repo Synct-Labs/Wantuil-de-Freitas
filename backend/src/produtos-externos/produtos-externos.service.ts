@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-interface ProdutoEncontrado {
+export interface ProdutoEncontrado {
   ean: string;
   nome: string;
   marca?: string;
