@@ -65,9 +65,14 @@ export default function Scanner({ onClose, onItemEncontrado, onCadastroManual }:
 
   function fonteLabel(fonte: string): string {
     const map: Record<string, string> = {
+      'catalogo-local': 'Catálogo da instituição (consulta anterior)',
+      'dotcompany': 'DotCompany (base brasileira)',
+      'produto-xyz': 'Produto XYZ (base colaborativa brasileira)',
+      'cosmos-bluesoft': 'Cosmos Bluesoft (referência brasileira)',
       'open-food-facts': 'Open Food Facts (alimentos)',
       'open-beauty-facts': 'Open Beauty Facts (higiene)',
       'open-products-facts': 'Open Products Facts (limpeza/geral)',
+      'upcitemdb': 'UPCitemdb (base internacional)',
     };
     return map[fonte] || fonte;
   }

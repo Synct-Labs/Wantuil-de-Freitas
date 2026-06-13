@@ -190,6 +190,19 @@ function FormItem({ item, eanInicial, nomeInicial, categoriaSugerida, categorias
     try {
       if (item) await api.patch(`/itens/${item.id}`, form);
       else await api.post('/itens', form);
+
+      // Se o item tem EAN, salvar no catalogo local para acelerar leituras futuras.
+      // Falha silenciosa: o item ja foi cadastrado com sucesso, o cache e secundario.
+      if (form.codigoEan && form.nome) {
+        const categoriaNome = categorias.find((c: any) => c.id === form.categoriaId)?.nome;
+        api.post('/produtos-externos/salvar-manual', {
+          ean: form.codigoEan,
+          nome: form.nome,
+          categoria: categoriaNome,
+          categoriaSugerida: categoriaNome,
+        }).catch(() => {/* silencioso */});
+      }
+
       onSave();
     } catch (e: any) {
       setErro(e.response?.data?.message || 'Erro ao salvar');
