@@ -42,7 +42,7 @@ export default function Login() {
       }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ display: 'inline-block', marginBottom: 16 }}>
-            <Logo size={72} light={false} />
+            <Logo variant="login" size={120} />
           </div>
           <div style={{
             fontSize: 13, color: 'var(--text-2)',
