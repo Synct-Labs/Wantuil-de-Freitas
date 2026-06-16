@@ -277,32 +277,171 @@ function Categorias() {
 }
 
 function Notificacoes() {
-  const [enviando, setEnviando] = useState(false);
+  const [acaoAtiva, setAcaoAtiva] = useState<string | null>(null);
+  const [resultado, setResultado] = useState<{ titulo: string; mensagem: string; tipo: 'sucesso' | 'aviso' | 'erro' } | null>(null);
+  const [diagnostico, setDiagnostico] = useState<any>(null);
 
-  async function testar() {
-    setEnviando(true);
+  async function executar(acao: string, fn: () => Promise<any>) {
+    setAcaoAtiva(acao);
+    setResultado(null);
     try {
-      await api.post('/notificacoes/testar-resumo');
-      alert('Resumo semanal disparado com sucesso.\nVerifique o e-mail configurado.');
+      const data = await fn();
+      return data;
     } catch (e: any) {
-      alert(e.response?.data?.message || 'Erro ao disparar');
-    } finally { setEnviando(false); }
+      setResultado({
+        titulo: 'Falha na operação',
+        mensagem: e.response?.data?.message || e.message || 'Erro desconhecido',
+        tipo: 'erro',
+      });
+    } finally {
+      setAcaoAtiva(null);
+    }
+  }
+
+  async function verificarAgora() {
+    const data = await executar('verificar', () =>
+      api.post('/notificacoes/verificar-agora').then(r => r.data),
+    );
+    if (data) {
+      setResultado({
+        titulo: 'Verificação concluída',
+        mensagem: `Foram analisados ${data.itensVerificados} itens. Criadas ${data.notificacoesCriadas} novas notificações (sem contar as que já existiam).`,
+        tipo: data.notificacoesCriadas > 0 ? 'sucesso' : 'aviso',
+      });
+    }
+  }
+
+  async function dispararResumo() {
+    await executar('resumo', () => api.post('/notificacoes/testar-resumo'));
+    setResultado({
+      titulo: 'Resumo semanal disparado',
+      mensagem: 'Uma notificação foi criada com o resumo completo. Se o e-mail estiver configurado, também foi enviado.',
+      tipo: 'sucesso',
+    });
+  }
+
+  async function verDiagnostico() {
+    const data = await executar('diag', () =>
+      api.get('/notificacoes/diagnostico-email').then(r => r.data),
+    );
+    if (data) setDiagnostico(data);
+  }
+
+  async function testarEmail() {
+    const data = await executar('email', () =>
+      api.post('/notificacoes/testar-email').then(r => r.data),
+    );
+    if (data) {
+      setResultado({
+        titulo: data.sucesso ? 'E-mail enviado' : 'Falha ao enviar e-mail',
+        mensagem: data.sucesso ? data.mensagem : (data.motivo || 'Verifique o diagnóstico abaixo'),
+        tipo: data.sucesso ? 'sucesso' : 'erro',
+      });
+      if (data.diagnostico) setDiagnostico(data.diagnostico);
+    }
   }
 
   return (
-    <div className="card">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        <Icon name="bell" size={16} color="var(--primary-dk)" />
-        <span style={{ fontSize: 13, fontWeight: 600 }}>Notificações automáticas</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Notificações in-app */}
+      <div className="card">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <Icon name="bell" size={16} color="var(--primary-dk)" />
+          <span style={{ fontSize: 13, fontWeight: 600 }}>Notificações no sistema</span>
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 14, lineHeight: 1.5 }}>
+          O sistema cria notificações automaticamente quando itens ficam abaixo do mínimo,
+          quando há produtos próximos do vencimento ou que precisam de descarte. Elas aparecem
+          no sino do canto superior direito.
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="btn primary" onClick={verificarAgora} disabled={!!acaoAtiva}>
+            {acaoAtiva === 'verificar'
+              ? <><span className="spinner" /> Verificando…</>
+              : <><Icon name="refresh" size={14} /> Verificar agora</>}
+          </button>
+          <button className="btn" onClick={dispararResumo} disabled={!!acaoAtiva}>
+            {acaoAtiva === 'resumo'
+              ? <><span className="spinner" /> Gerando…</>
+              : <><Icon name="file-text" size={14} /> Gerar resumo semanal agora</>}
+          </button>
+        </div>
+        <div style={{ marginTop: 12, padding: '8px 10px', borderRadius: 6, background: 'var(--surface-2)', fontSize: 11, color: 'var(--text-2)', lineHeight: 1.5 }}>
+          <strong>Verificação automática:</strong> todo dia às 08h e todo sábado às 08h (horário de Brasília).
+        </div>
       </div>
-      <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 16, lineHeight: 1.5 }}>
-        O resumo semanal é enviado automaticamente todo sábado às 08h00 (horário de Brasília)
-        para os administradores cadastrados, contendo: itens próximos ao vencimento, em período adicional,
-        para descarte, e abaixo do estoque mínimo.
+
+      {/* E-mail */}
+      <div className="card">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <Icon name="mail" size={16} color="var(--primary-dk)" />
+          <span style={{ fontSize: 13, fontWeight: 600 }}>E-mail (resumo semanal)</span>
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 14, lineHeight: 1.5 }}>
+          Além das notificações no sistema, o resumo de sábado também pode ser enviado por e-mail.
+          Para isso, configure no Render as variáveis <code>RESEND_API_KEY</code>, <code>EMAIL_FROM</code> (opcional) e <code>EMAIL_NOTIFICACOES</code>.
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="btn" onClick={verDiagnostico} disabled={!!acaoAtiva}>
+            {acaoAtiva === 'diag'
+              ? <><span className="spinner" /> Carregando…</>
+              : <><Icon name="info" size={14} /> Ver configuração</>}
+          </button>
+          <button className="btn" onClick={testarEmail} disabled={!!acaoAtiva}>
+            {acaoAtiva === 'email'
+              ? <><span className="spinner" /> Enviando…</>
+              : <><Icon name="mail" size={14} /> Enviar e-mail de teste</>}
+          </button>
+        </div>
+
+        {diagnostico && (
+          <div style={{ marginTop: 14, padding: 12, borderRadius: 6,
+            background: diagnostico.configurado ? 'var(--green-bg)' : 'var(--a-50)',
+            border: `1px solid ${diagnostico.configurado ? 'var(--green)' : 'var(--a-200)'}`,
+            fontSize: 12 }}>
+            <div style={{ fontWeight: 600, marginBottom: 6,
+              color: diagnostico.configurado ? 'var(--green)' : 'var(--a-600)' }}>
+              {diagnostico.configurado ? 'Configuração OK' : 'Configuração incompleta'}
+            </div>
+            <div style={{ fontFamily: 'monospace', fontSize: 11, lineHeight: 1.8, color: 'var(--text-2)' }}>
+              <div><strong>RESEND_API_KEY:</strong> {diagnostico.detalhes.RESEND_API_KEY}</div>
+              <div><strong>EMAIL_FROM:</strong> {diagnostico.detalhes.EMAIL_FROM}</div>
+              <div><strong>EMAIL_NOTIFICACOES:</strong> {diagnostico.detalhes.EMAIL_NOTIFICACOES}</div>
+            </div>
+            {diagnostico.observacao && (
+              <div style={{ marginTop: 8, fontSize: 11, color: 'var(--a-600)', lineHeight: 1.5 }}>
+                ⚠ {diagnostico.observacao}
+              </div>
+            )}
+          </div>
+        )}
       </div>
-      <button className="btn" onClick={testar} disabled={enviando}>
-        {enviando ? <><span className="spinner" /> Enviando...</> : <><Icon name="mail" size={14} /> Disparar resumo agora</>}
-      </button>
+
+      {/* Feedback de operação */}
+      {resultado && (
+        <div className="card" style={{
+          background: resultado.tipo === 'sucesso' ? 'var(--green-bg)'
+            : resultado.tipo === 'erro' ? 'var(--r-50)' : 'var(--a-50)',
+          borderColor: resultado.tipo === 'sucesso' ? 'var(--green)'
+            : resultado.tipo === 'erro' ? 'var(--r-600)' : 'var(--a-200)',
+        }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            <Icon
+              name={resultado.tipo === 'sucesso' ? 'check' : resultado.tipo === 'erro' ? 'alert-circle' : 'info'}
+              size={16}
+              color={resultado.tipo === 'sucesso' ? 'var(--green)' : resultado.tipo === 'erro' ? 'var(--r-600)' : 'var(--a-600)'}
+              style={{ marginTop: 1 }}
+            />
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4,
+                color: resultado.tipo === 'sucesso' ? 'var(--green)' : resultado.tipo === 'erro' ? 'var(--r-600)' : 'var(--a-600)' }}>
+                {resultado.titulo}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.5 }}>{resultado.mensagem}</div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

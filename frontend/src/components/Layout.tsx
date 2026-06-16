@@ -3,6 +3,7 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Icon, { IconName } from './Icon';
 import Logo from './Logo';
+import NotificacoesBell from './NotificacoesBell';
 
 interface NavLinkDef { to: string; label: string; icon: IconName; requer?: string }
 
@@ -50,7 +51,10 @@ export default function Layout() {
       {/* Sidebar */}
       <nav className={`sidebar ${menuOpen ? 'open' : ''}`}>
         <div style={{ padding: '20px 18px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <Logo />
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            <div style={{ flex: 1, minWidth: 0 }}><Logo /></div>
+            <div className="desktop-only"><NotificacoesBell /></div>
+          </div>
           <div style={{ marginTop: 12, fontSize: 11, color: 'rgba(255,255,255,0.55)', letterSpacing: '.04em' }}>
             Sistema de Almoxarifado
           </div>
@@ -119,7 +123,8 @@ export default function Layout() {
           <button className="topbar-toggle" onClick={() => setMenuOpen(true)} aria-label="Abrir menu">
             <Icon name="menu" size={22} />
           </button>
-          <div className="topbar-title">{pageTitle}</div>
+          <div className="topbar-title" style={{ flex: 1 }}>{pageTitle}</div>
+          <div style={{ color: 'var(--text)' }}><NotificacoesBell /></div>
         </div>
         <div className="content">
           <Outlet />
