@@ -1,11 +1,15 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificacoesService } from '../notificacoes/notificacoes.service';
 
 export interface ItemMov { itemId: string; quantidade: number; dataValidade?: string }
 
 @Injectable()
 export class MovimentacoesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificacoes: NotificacoesService,
+  ) {}
 
   findAll(filtros: { tipo?: string; dataInicio?: string; dataFim?: string; setorId?: string }) {
     const where: any = {};
@@ -137,7 +141,7 @@ export class MovimentacoesService {
       };
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const resultado = await this.prisma.$transaction(async (tx) => {
       const mov = await tx.movimentacao.create({
         data: {
           tipo: 'SAIDA',
@@ -177,6 +181,36 @@ export class MovimentacoesService {
         include: { itens: { include: { item: true } }, beneficiario: true, setor: true },
       });
     });
+
+    // Apos commit da transacao: cria notificacoes para itens que ficaram abaixo do minimo.
+    // Falha silenciosa: a movimentacao ja foi gravada, notificacao e secundaria.
+    try {
+      for (const im of dto.itens) {
+        const item = await this.prisma.item.findUnique({ where: { id: im.itemId } });
+        if (!item) continue;
+        if (Number(item.saldoAtual) <= Number(item.estoqueMinimo) && Number(item.estoqueMinimo) > 0) {
+          await this.notificacoes.criarSeNova(
+            'ABAIXO_MINIMO',
+            `Estoque abaixo do mínimo: ${item.nome}`,
+            `Após a última saída, o item "${item.nome}" ficou com saldo ${item.saldoAtual} ${item.unidadeMedida} (mínimo: ${item.estoqueMinimo}).`,
+            'AVISO',
+          );
+        }
+        if (Number(item.saldoAtual) === 0) {
+          await this.notificacoes.criarSeNova(
+            'ESGOTADO',
+            `Item esgotado: ${item.nome}`,
+            `O item "${item.nome}" está com saldo zero. Considere providenciar reposição.`,
+            'CRITICO',
+          );
+        }
+      }
+    } catch (e: any) {
+      // Log silencioso - nao interrompe o fluxo
+      console.warn(`[MovimentacoesService] Falha ao criar notificacao pos-saida: ${e.message}`);
+    }
+
+    return resultado;
   }
 
   // ── DESCARTE ─────────────────────────────────────────────
