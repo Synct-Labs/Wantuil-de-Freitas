@@ -28,7 +28,7 @@ export class RelatoriosService {
       saldo: Number(i.saldoAtual),
       unidade: i.unidadeMedida,
       minimo: Number(i.estoqueMinimo),
-      abaixoMinimo: Number(i.saldoAtual) <= Number(i.estoqueMinimo),
+      abaixoMinimo: Number(i.estoqueMinimo) > 0 && Number(i.saldoAtual) <= Number(i.estoqueMinimo),
       validade: i.dataValidade,
       statusValidade: calcularStatusValidade(i.dataValidade),
     }));
@@ -201,7 +201,7 @@ export class RelatoriosService {
     const paraDescarte = itensAlerta.filter((i) =>
       calcularStatusValidade(i.dataValidade) === 'DESCARTE').length;
     const abaixoMinimo = itensAlerta.filter((i) =>
-      Number(i.saldoAtual) <= Number(i.estoqueMinimo)).length;
+      Number(i.estoqueMinimo) > 0 && Number(i.saldoAtual) <= Number(i.estoqueMinimo)).length;
 
     return {
       periodo: { inicio: dataInicio, fim: dataFim },

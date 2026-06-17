@@ -50,7 +50,7 @@ export class ItensService {
     return itens.map((i) => ({
       ...i,
       statusValidade: calcularStatusValidade(i.dataValidade),
-      abaixoMinimo: Number(i.saldoAtual) <= Number(i.estoqueMinimo),
+      abaixoMinimo: Number(i.estoqueMinimo) > 0 && Number(i.saldoAtual) <= Number(i.estoqueMinimo),
     }));
   }
 
