@@ -9,6 +9,7 @@ import Entradas from './pages/Entradas';
 import Saidas from './pages/Saidas';
 import Validade from './pages/Validade';
 import Setores from './pages/Setores';
+import Eventos from './pages/Eventos';
 import Doadores from './pages/Doadores';
 import Beneficiarios from './pages/Beneficiarios';
 import Relatorios from './pages/Relatorios';
@@ -49,6 +50,7 @@ export default function App() {
           <Route path="saidas" element={<RequerPermissao acao="mov.saida"><Saidas /></RequerPermissao>} />
           <Route path="validade" element={<Validade />} />
           <Route path="setores" element={<Setores />} />
+          <Route path="eventos" element={<Eventos />} />
           <Route path="doadores" element={<Doadores />} />
           <Route path="beneficiarios" element={<Beneficiarios />} />
           <Route path="relatorios" element={<RequerPermissao acao="relatorios.ver"><Relatorios /></RequerPermissao>} />

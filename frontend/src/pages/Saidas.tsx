@@ -15,11 +15,12 @@ interface LinhaLoteSaida {
 }
 
 export default function Saidas() {
-  const [destinoTipo, setDestinoTipo] = useState<'BENEFICIARIO' | 'SETOR'>('BENEFICIARIO');
+  const [destinoTipo, setDestinoTipo] = useState<'BENEFICIARIO' | 'SETOR' | 'EVENTO'>('BENEFICIARIO');
   const [destinoId, setDestinoId] = useState('');
   const [finalidade, setFinalidade] = useState('');
   const [beneficiarios, setBeneficiarios] = useState<any[]>([]);
   const [setores, setSetores] = useState<any[]>([]);
+  const [eventos, setEventos] = useState<any[]>([]);
   const [linhas, setLinhas] = useState<LinhaLoteSaida[]>([]);
   const [movs, setMovs] = useState<any[]>([]);
   const [showScanner, setShowScanner] = useState(false);
@@ -30,6 +31,8 @@ export default function Saidas() {
   useEffect(() => {
     api.get('/beneficiarios').then((r) => setBeneficiarios(r.data.filter((b: any) => b.ativo)));
     api.get('/setores').then((r) => setSetores(r.data));
+    api.get('/eventos').then((r) => setEventos(r.data.filter((e: any) =>
+      e.status === 'PLANEJADO' || e.status === 'EM_ANDAMENTO')));
     carregarMovs();
   }, []);
 
@@ -71,7 +74,9 @@ export default function Saidas() {
     try {
       const payload: any = {
         destinoSaida: destinoTipo,
-        ...(destinoTipo === 'BENEFICIARIO' ? { beneficiarioId: destinoId } : { setorId: destinoId }),
+        ...(destinoTipo === 'BENEFICIARIO' ? { beneficiarioId: destinoId }
+          : destinoTipo === 'SETOR' ? { setorId: destinoId }
+          : { eventoId: destinoId }),
         finalidade,
         confirmadoMinimo,
         lotes: linhas.map((l) => ({ loteId: l.loteId, quantidade: l.quantidade })),
@@ -109,16 +114,28 @@ export default function Saidas() {
                 onChange={(e) => { setDestinoTipo(e.target.value as any); setDestinoId(''); }}>
                 <option value="BENEFICIARIO">Beneficiário</option>
                 <option value="SETOR">Setor interno</option>
+                <option value="EVENTO">Evento</option>
               </select>
             </div>
             <div>
-              <label className="label">{destinoTipo === 'BENEFICIARIO' ? 'Beneficiário' : 'Setor'} *</label>
+              <label className="label">
+                {destinoTipo === 'BENEFICIARIO' ? 'Beneficiário'
+                  : destinoTipo === 'SETOR' ? 'Setor'
+                  : 'Evento'} *
+              </label>
               <select className="select" value={destinoId} onChange={(e) => setDestinoId(e.target.value)}>
                 <option value="">Selecione…</option>
                 {destinoTipo === 'BENEFICIARIO'
                   ? beneficiarios.map((b: any) => <option key={b.id} value={b.id}>{b.nome}</option>)
-                  : setores.map((s: any) => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                  : destinoTipo === 'SETOR'
+                  ? setores.map((s: any) => <option key={s.id} value={s.id}>{s.nome}</option>)
+                  : eventos.map((ev: any) => <option key={ev.id} value={ev.id}>{ev.nome}</option>)}
               </select>
+              {destinoTipo === 'EVENTO' && eventos.length === 0 && (
+                <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
+                  Nenhum evento ativo. Crie ou inicie um evento primeiro.
+                </div>
+              )}
             </div>
           </div>
 

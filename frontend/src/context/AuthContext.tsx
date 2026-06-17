@@ -34,6 +34,7 @@ const PERMISSOES: Record<string, string[]> = {
   'setores.gerenciar':  ['ADMIN'],
   'categorias.gerenciar':['ADMIN'],
   'usuarios.gerenciar': ['ADMIN'],
+  'eventos.criar':      ['ADMIN', 'ALMOXARIFE', 'GESTOR'],
   // Visao
   'relatorios.ver':     ['ADMIN', 'ALMOXARIFE', 'GESTOR'],
   'auditoria.ver':      ['ADMIN'],
