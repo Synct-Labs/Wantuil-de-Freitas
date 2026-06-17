@@ -8,14 +8,17 @@ import { EtiquetasService } from './etiquetas.service';
 export class EtiquetasController {
   constructor(private service: EtiquetasService) {}
 
-  @Get(':itemId')
-  async gerar(
-    @Param('itemId') itemId: string,
+  /**
+   * Gera N etiquetas para um lote especifico.
+   * URL: /api/etiquetas/lote/:loteId?qtd=5
+   */
+  @Get('lote/:loteId')
+  async gerarLote(
+    @Param('loteId') loteId: string,
     @Query('qtd') qtd: string,
-    @Query('dataEntrada') dataEntrada: string,
     @Res() res: Response,
   ) {
-    const pdf = await this.service.gerarPdf(itemId, Math.max(1, parseInt(qtd) || 1), dataEntrada);
+    const pdf = await this.service.gerarPdfLote(loteId, Math.max(1, parseInt(qtd) || 1));
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'inline; filename=etiquetas.pdf',

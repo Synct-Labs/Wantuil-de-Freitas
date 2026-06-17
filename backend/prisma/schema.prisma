@@ -75,6 +75,7 @@ model Setor {
 
   itens         Item[]
   movimentacoes Movimentacao[]
+  lotes         Lote[]
 
   @@map("setores")
 }
@@ -88,6 +89,7 @@ model Item {
   unidadeMedida String    @default("un") @map("unidade_medida")
   estoqueMinimo Decimal   @default(0) @map("estoque_minimo") @db.Decimal(10, 2)
   saldoAtual    Decimal   @default(0) @map("saldo_atual") @db.Decimal(10, 2)
+  // dataValidade e localizacao agora ficam no Lote (deprecated aqui, mantido para compat)
   dataValidade  DateTime? @map("data_validade") @db.Date
   localizacao   String?
   ativo         Boolean   @default(true)
@@ -99,11 +101,44 @@ model Item {
   setorId     String?   @map("setor_id")
   setor       Setor?    @relation(fields: [setorId], references: [id])
 
+  lotes             Lote[]
   movimentacaoItens MovimentacaoItem[]
 
   @@index([codigoEan])
   @@index([nome])
   @@map("itens")
+}
+
+// ────────────────────────────────────────────────────────────────────
+// LOTE: cada entrada fisica de um item, com sua propria validade.
+// Etiqueta: barcode Code128 do codigoLote (formato L-AAAAMMDD-NNNN).
+// Saida: scanner le a etiqueta do lote e abate da quantidadeAtual.
+// ────────────────────────────────────────────────────────────────────
+model Lote {
+  id                String    @id @default(uuid())
+  codigoLote        String    @unique @map("codigo_lote")
+  itemId            String    @map("item_id")
+  item              Item      @relation(fields: [itemId], references: [id])
+  quantidadeInicial Decimal   @map("quantidade_inicial") @db.Decimal(10, 2)
+  quantidadeAtual   Decimal   @map("quantidade_atual") @db.Decimal(10, 2)
+  dataEntrada       DateTime  @default(now()) @map("data_entrada") @db.Date
+  dataValidade      DateTime? @map("data_validade") @db.Date
+  doadorId          String?   @map("doador_id")
+  doador            Doador?   @relation(fields: [doadorId], references: [id])
+  setorId           String?   @map("setor_id")
+  setor             Setor?    @relation(fields: [setorId], references: [id])
+  localizacao       String?
+  observacao        String?
+  ativo             Boolean   @default(true)
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  movimentacaoItens MovimentacaoItem[]
+
+  @@index([itemId])
+  @@index([codigoLote])
+  @@index([dataValidade])
+  @@map("lotes")
 }
 
 model Doador {
@@ -119,6 +154,7 @@ model Doador {
   createdAt  DateTime   @default(now())
 
   movimentacoes Movimentacao[]
+  lotes         Lote[]
 
   @@map("doadores")
 }
@@ -180,6 +216,8 @@ model MovimentacaoItem {
   movimentacao   Movimentacao @relation(fields: [movimentacaoId], references: [id], onDelete: Cascade)
   itemId         String       @map("item_id")
   item           Item         @relation(fields: [itemId], references: [id])
+  loteId         String?      @map("lote_id")
+  lote           Lote?        @relation(fields: [loteId], references: [id])
 
   @@map("movimentacao_itens")
 }

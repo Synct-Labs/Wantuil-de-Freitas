@@ -13,6 +13,8 @@ import { EtiquetasModule } from './etiquetas/etiquetas.module';
 import { RelatoriosModule } from './relatorios/relatorios.module';
 import { NotificacoesModule } from './notificacoes/notificacoes.module';
 import { ProdutosExternosModule } from './produtos-externos/produtos-externos.module';
+import { LotesModule } from './lotes/lotes.module';
+import { SistemaModule } from './sistema/sistema.module';
 
 @Module({
   imports: [
@@ -30,6 +32,8 @@ import { ProdutosExternosModule } from './produtos-externos/produtos-externos.mo
     RelatoriosModule,
     NotificacoesModule,
     ProdutosExternosModule,
+    LotesModule,
+    SistemaModule,
   ],
 })
 export class AppModule {}

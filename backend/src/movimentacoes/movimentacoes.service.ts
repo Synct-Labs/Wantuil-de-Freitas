@@ -1,16 +1,54 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificacoesService } from '../notificacoes/notificacoes.service';
+import { LotesService } from '../lotes/lotes.service';
 
-export interface ItemMov { itemId: string; quantidade: number; dataValidade?: string }
+// ─── DTOs ─────────────────────────────────────────────────────────
+export interface DTOEntrada {
+  doadorId?: string | null;
+  observacao?: string | null;
+  dataMovimentacao?: string | Date;
+  /**
+   * Cada elemento define UM lote a ser criado.
+   * Para 5 pacotes de arroz com mesma validade: 1 elemento com quantidade=5.
+   * Para 5 pacotes com validades diferentes: 5 elementos.
+   */
+  lotes: Array<{
+    itemId: string;
+    quantidade: number;
+    dataValidade?: string | null;
+    setorId?: string | null;
+    localizacao?: string | null;
+    observacao?: string | null;
+  }>;
+}
+
+export interface DTOSaida {
+  destinoSaida: 'BENEFICIARIO' | 'SETOR';
+  beneficiarioId?: string | null;
+  setorId?: string | null;
+  finalidade?: string;
+  observacao?: string | null;
+  dataMovimentacao?: string | Date;
+  confirmadoMinimo?: boolean;
+  /**
+   * Cada elemento e uma "leitura de etiqueta + qtd" a abater do lote.
+   * O usuario le a etiqueta do lote e informa quantas unidades vai retirar.
+   */
+  lotes: Array<{ loteId: string; quantidade: number }>;
+}
 
 @Injectable()
 export class MovimentacoesService {
+  private logger = new Logger('MovimentacoesService');
+
   constructor(
     private prisma: PrismaService,
     private notificacoes: NotificacoesService,
+    private lotesService: LotesService,
   ) {}
 
+  // ═══════════════ LEITURA ═══════════════
   findAll(filtros: { tipo?: string; dataInicio?: string; dataFim?: string; setorId?: string }) {
     const where: any = {};
     if (filtros.tipo) where.tipo = filtros.tipo;
@@ -18,31 +56,38 @@ export class MovimentacoesService {
     if (filtros.dataInicio || filtros.dataFim) {
       where.dataMovimentacao = {};
       if (filtros.dataInicio) where.dataMovimentacao.gte = new Date(filtros.dataInicio);
-      if (filtros.dataFim) where.dataMovimentacao.lte = new Date(filtros.dataFim);
+      if (filtros.dataFim) {
+        const fim = new Date(filtros.dataFim);
+        fim.setHours(23, 59, 59, 999);
+        where.dataMovimentacao.lte = fim;
+      }
     }
     return this.prisma.movimentacao.findMany({
       where,
       include: {
-        itens: { include: { item: true } },
-        doador: true, beneficiario: true, setor: true,
+        itens: { include: { item: true, lote: true } },
+        doador: true,
+        beneficiario: true,
+        setor: true,
         usuario: { select: { id: true, nome: true } },
       },
       orderBy: { createdAt: 'desc' },
-      take: 200,
     });
   }
 
-  // ── ENTRADA ──────────────────────────────────────────────
-  async registrarEntrada(usuarioId: string, dto: {
-    doadorId?: string; observacao?: string; dataMovimentacao?: string; itens: ItemMov[];
-  }) {
-    if (!dto.itens?.length) throw new BadRequestException('Informe ao menos um item');
-    for (const i of dto.itens) {
-      if (!i.quantidade || i.quantidade <= 0) throw new BadRequestException('Quantidade deve ser maior que zero');
+  // ═══════════════ ENTRADA: cria 1 movimentacao + N lotes ═══════════════
+  async registrarEntrada(usuarioId: string, dto: DTOEntrada) {
+    if (!dto.lotes?.length) throw new BadRequestException('Adicione ao menos um lote');
+    for (const l of dto.lotes) {
+      if (!l.itemId) throw new BadRequestException('Item obrigatório em cada lote');
+      if (!l.quantidade || Number(l.quantidade) <= 0) {
+        throw new BadRequestException('Quantidade deve ser maior que zero em todos os lotes');
+      }
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const mov = await tx.movimentacao.create({
+    // 1. Cria a movimentacao (header) numa transacao curta
+    const mov = await this.prisma.$transaction(async (tx) => {
+      const m = await tx.movimentacao.create({
         data: {
           tipo: 'ENTRADA',
           doadorId: dto.doadorId || null,
@@ -51,98 +96,115 @@ export class MovimentacoesService {
           usuarioId,
         },
       });
-
-      for (const im of dto.itens) {
-        const item = await tx.item.findUnique({ where: { id: im.itemId } });
-        if (!item) throw new NotFoundException(`Item ${im.itemId} nao encontrado`);
-
-        const saldoAnterior = Number(item.saldoAtual);
-        const saldoPosterior = saldoAnterior + Number(im.quantidade);
-
-        await tx.movimentacaoItem.create({
-          data: {
-            movimentacaoId: mov.id,
-            itemId: im.itemId,
-            quantidade: im.quantidade,
-            dataValidade: im.dataValidade ? new Date(im.dataValidade) : null,
-            saldoAnterior, saldoPosterior,
-          },
-        });
-
-        await tx.item.update({
-          where: { id: im.itemId },
-          data: {
-            saldoAtual: saldoPosterior,
-            ...(im.dataValidade ? { dataValidade: new Date(im.dataValidade) } : {}),
-          },
-        });
-      }
-
       await tx.logAuditoria.create({
-        data: { acao: 'ENTRADA', entidade: 'Movimentacao', entidadeId: mov.id, usuarioId,
-          detalhes: { itens: dto.itens.length } },
+        data: { acao: 'ENTRADA', entidade: 'Movimentacao', entidadeId: m.id, usuarioId,
+          detalhes: { numLotes: dto.lotes.length } },
       });
+      return m;
+    });
 
-      return tx.movimentacao.findUnique({
-        where: { id: mov.id },
-        include: { itens: { include: { item: true } }, doador: true },
+    // 2. Cria os lotes (cada um recalcula o saldoAtual do item)
+    const lotesCriados: any[] = [];
+    for (const l of dto.lotes) {
+      const lote = await this.lotesService.criar({
+        itemId: l.itemId,
+        quantidade: l.quantidade,
+        dataValidade: l.dataValidade,
+        doadorId: dto.doadorId || null,
+        setorId: l.setorId,
+        localizacao: l.localizacao,
+        observacao: l.observacao,
       });
+      lotesCriados.push(lote);
+
+      // Registra MovimentacaoItem (rastreabilidade: este lote foi criado nesta movimentacao)
+      const itemAtual = await this.prisma.item.findUnique({ where: { id: l.itemId } });
+      const saldoAtualItem = Number(itemAtual?.saldoAtual || 0);
+      await this.prisma.movimentacaoItem.create({
+        data: {
+          movimentacaoId: mov.id,
+          itemId: l.itemId,
+          loteId: lote.id,
+          quantidade: Number(l.quantidade),
+          dataValidade: l.dataValidade ? new Date(l.dataValidade) : null,
+          saldoAnterior: saldoAtualItem - Number(l.quantidade),
+          saldoPosterior: saldoAtualItem,
+        },
+      });
+    }
+
+    return this.prisma.movimentacao.findUnique({
+      where: { id: mov.id },
+      include: {
+        itens: { include: { item: true, lote: true } },
+        doador: true,
+      },
     });
   }
 
-  // ── SAÍDA (com regra de estoque mínimo) ──────────────────
-  async registrarSaida(usuarioId: string, dto: {
-    destinoSaida: 'BENEFICIARIO' | 'SETOR';
-    beneficiarioId?: string; setorId?: string;
-    finalidade?: string; observacao?: string; dataMovimentacao?: string;
-    confirmadoMinimo?: boolean;
-    itens: ItemMov[];
-  }) {
-    if (!dto.itens?.length) throw new BadRequestException('Informe ao menos um item');
-
-    if (dto.destinoSaida === 'BENEFICIARIO') {
-      if (!dto.beneficiarioId) throw new BadRequestException('Beneficiario obrigatorio');
-      const b = await this.prisma.beneficiario.findUnique({ where: { id: dto.beneficiarioId } });
-      if (!b) throw new NotFoundException('Beneficiario nao encontrado');
-      if (!b.ativo) throw new BadRequestException('Beneficiario inativo nao pode receber itens (RN-11)');
+  // ═══════════════ SAÍDA: abate de lotes especificos ═══════════════
+  async registrarSaida(usuarioId: string, dto: DTOSaida) {
+    if (!dto.lotes?.length) throw new BadRequestException('Adicione ao menos um lote');
+    if (dto.destinoSaida === 'BENEFICIARIO' && !dto.beneficiarioId) {
+      throw new BadRequestException('Selecione o beneficiário');
     }
     if (dto.destinoSaida === 'SETOR' && !dto.setorId) {
-      throw new BadRequestException('Setor obrigatorio');
+      throw new BadRequestException('Selecione o setor');
+    }
+    for (const l of dto.lotes) {
+      if (!l.loteId) throw new BadRequestException('Lote obrigatório em cada linha');
+      if (!l.quantidade || Number(l.quantidade) <= 0) {
+        throw new BadRequestException('Quantidade deve ser maior que zero');
+      }
     }
 
-    // 1a passada: validar saldos e detectar violacao de minimo
+    // ── Pre-validacao: verifica saldos disponiveis e violacoes de minimo ──
     const violacoesMinimo: any[] = [];
-    for (const im of dto.itens) {
-      const item = await this.prisma.item.findUnique({ where: { id: im.itemId } });
-      if (!item) throw new NotFoundException(`Item nao encontrado`);
+    // Agrupa quantidades por itemId pra checar minimo do agregado
+    const totalPorItem: Record<string, { item: any; subtotal: number }> = {};
 
-      const saldoResultante = Number(item.saldoAtual) - Number(im.quantidade);
-      if (saldoResultante < 0) {
+    for (const l of dto.lotes) {
+      const lote = await this.prisma.lote.findUnique({
+        where: { id: l.loteId },
+        include: { item: true },
+      });
+      if (!lote) throw new BadRequestException(`Lote ${l.loteId} não encontrado`);
+      if (!lote.ativo) throw new BadRequestException(`Lote ${lote.codigoLote} já está esgotado`);
+      const qtd = Number(l.quantidade);
+      if (qtd > Number(lote.quantidadeAtual)) {
         throw new BadRequestException(
-          `Saldo insuficiente para "${item.nome}": disponivel ${item.saldoAtual}, solicitado ${im.quantidade} (RN-01)`
+          `Saldo insuficiente no lote ${lote.codigoLote}: disponível ${lote.quantidadeAtual} ${lote.item.unidadeMedida}, solicitado ${qtd}`,
         );
       }
-      if (saldoResultante <= Number(item.estoqueMinimo)) {
+      const grupo = totalPorItem[lote.itemId] || { item: lote.item, subtotal: 0 };
+      grupo.subtotal += qtd;
+      totalPorItem[lote.itemId] = grupo;
+    }
+
+    // Checa violacao de minimo (saldo final do item < estoqueMinimo)
+    for (const grupo of Object.values(totalPorItem)) {
+      const saldoFinal = Number(grupo.item.saldoAtual) - grupo.subtotal;
+      if (Number(grupo.item.estoqueMinimo) > 0 && saldoFinal < Number(grupo.item.estoqueMinimo)) {
         violacoesMinimo.push({
-          item: item.nome,
-          saldoAtual: Number(item.saldoAtual),
-          saldoResultante,
-          estoqueMinimo: Number(item.estoqueMinimo),
+          item: grupo.item.nome,
+          saldoAtual: Number(grupo.item.saldoAtual),
+          saldoResultante: saldoFinal,
+          estoqueMinimo: Number(grupo.item.estoqueMinimo),
         });
       }
     }
 
-    // RN-02: exige confirmacao explicita quando minimo for violado
     if (violacoesMinimo.length > 0 && !dto.confirmadoMinimo) {
       return {
         requerConfirmacao: true,
-        mensagem: 'Esta retirada deixara o estoque abaixo do minimo. Confirme para prosseguir.',
+        mensagem: 'Esta saída deixa um ou mais itens abaixo do estoque mínimo.',
         violacoes: violacoesMinimo,
       };
     }
 
-    const resultado = await this.prisma.$transaction(async (tx) => {
-      const mov = await tx.movimentacao.create({
+    // ── Persistencia em transacao ──
+    const mov = await this.prisma.$transaction(async (tx) => {
+      return tx.movimentacao.create({
         data: {
           tipo: 'SAIDA',
           destinoSaida: dto.destinoSaida,
@@ -155,44 +217,44 @@ export class MovimentacoesService {
           usuarioId,
         },
       });
-
-      for (const im of dto.itens) {
-        const item = await tx.item.findUnique({ where: { id: im.itemId } });
-        const saldoAnterior = Number(item.saldoAtual);
-        const saldoPosterior = saldoAnterior - Number(im.quantidade);
-        if (saldoPosterior < 0) throw new BadRequestException(`Saldo insuficiente: ${item.nome}`);
-
-        await tx.movimentacaoItem.create({
-          data: {
-            movimentacaoId: mov.id, itemId: im.itemId,
-            quantidade: im.quantidade, saldoAnterior, saldoPosterior,
-          },
-        });
-        await tx.item.update({ where: { id: im.itemId }, data: { saldoAtual: saldoPosterior } });
-      }
-
-      await tx.logAuditoria.create({
-        data: { acao: 'SAIDA', entidade: 'Movimentacao', entidadeId: mov.id, usuarioId,
-          detalhes: { destino: dto.destinoSaida, confirmadoMinimo: dto.confirmadoMinimo || false } },
-      });
-
-      return tx.movimentacao.findUnique({
-        where: { id: mov.id },
-        include: { itens: { include: { item: true } }, beneficiario: true, setor: true },
-      });
     });
 
-    // Apos commit da transacao: cria notificacoes para itens que ficaram abaixo do minimo.
-    // Falha silenciosa: a movimentacao ja foi gravada, notificacao e secundaria.
+    // ── Abate de cada lote (recalcula saldo do item dentro de cada abate) ──
+    const itensRecalcular = new Set<string>();
+    for (const l of dto.lotes) {
+      const r = await this.lotesService.abaterDoLote(l.loteId, Number(l.quantidade));
+      await this.prisma.movimentacaoItem.create({
+        data: {
+          movimentacaoId: mov.id,
+          itemId: r.itemId,
+          loteId: l.loteId,
+          quantidade: Number(l.quantidade),
+          saldoAnterior: r.saldoAnterior,
+          saldoPosterior: r.saldoPosterior,
+        },
+      });
+      itensRecalcular.add(r.itemId);
+    }
+
+    for (const itemId of itensRecalcular) {
+      await this.lotesService.recalcularSaldoItem(itemId);
+    }
+
+    await this.prisma.logAuditoria.create({
+      data: { acao: 'SAIDA', entidade: 'Movimentacao', entidadeId: mov.id, usuarioId,
+        detalhes: { destino: dto.destinoSaida, numLotes: dto.lotes.length, confirmadoMinimo: dto.confirmadoMinimo || false } },
+    });
+
+    // ── Notificacoes pos-saida (silencioso em caso de falha) ──
     try {
-      for (const im of dto.itens) {
-        const item = await this.prisma.item.findUnique({ where: { id: im.itemId } });
+      for (const itemId of itensRecalcular) {
+        const item = await this.prisma.item.findUnique({ where: { id: itemId } });
         if (!item) continue;
         if (Number(item.saldoAtual) <= Number(item.estoqueMinimo) && Number(item.estoqueMinimo) > 0) {
           await this.notificacoes.criarSeNova(
             'ABAIXO_MINIMO',
             `Estoque abaixo do mínimo: ${item.nome}`,
-            `Após a última saída, o item "${item.nome}" ficou com saldo ${item.saldoAtual} ${item.unidadeMedida} (mínimo: ${item.estoqueMinimo}).`,
+            `Após a última saída, "${item.nome}" ficou com saldo ${item.saldoAtual} ${item.unidadeMedida} (mínimo: ${item.estoqueMinimo}).`,
             'AVISO',
           );
         }
@@ -206,68 +268,135 @@ export class MovimentacoesService {
         }
       }
     } catch (e: any) {
-      // Log silencioso - nao interrompe o fluxo
-      console.warn(`[MovimentacoesService] Falha ao criar notificacao pos-saida: ${e.message}`);
+      this.logger.warn(`Falha ao criar notificacao pos-saida: ${e.message}`);
     }
 
-    return resultado;
-  }
-
-  // ── DESCARTE ─────────────────────────────────────────────
-  async registrarDescarte(usuarioId: string, dto: { itemId: string; quantidade: number; motivo: string }) {
-    return this.prisma.$transaction(async (tx) => {
-      const item = await tx.item.findUnique({ where: { id: dto.itemId } });
-      if (!item) throw new NotFoundException('Item nao encontrado');
-
-      const saldoAnterior = Number(item.saldoAtual);
-      const saldoPosterior = Math.max(0, saldoAnterior - Number(dto.quantidade));
-
-      const mov = await tx.movimentacao.create({
-        data: { tipo: 'DESCARTE', observacao: dto.motivo, usuarioId },
-      });
-      await tx.movimentacaoItem.create({
-        data: { movimentacaoId: mov.id, itemId: dto.itemId, quantidade: dto.quantidade, saldoAnterior, saldoPosterior },
-      });
-      await tx.item.update({ where: { id: dto.itemId }, data: { saldoAtual: saldoPosterior, dataValidade: null } });
-      await tx.logAuditoria.create({
-        data: { acao: 'DESCARTE', entidade: 'Item', entidadeId: dto.itemId, usuarioId, detalhes: { motivo: dto.motivo } },
-      });
-      return mov;
+    return this.prisma.movimentacao.findUnique({
+      where: { id: mov.id },
+      include: {
+        itens: { include: { item: true, lote: true } },
+        beneficiario: true, setor: true,
+      },
     });
   }
 
-  // ── ESTORNO (RN-03: nada se exclui, tudo se estorna) ─────
-  async estornar(usuarioId: string, movimentacaoId: string) {
+  // ═══════════════ DESCARTE: abate quantidade de um lote ═══════════════
+  async registrarDescarte(usuarioId: string, dto: { loteId: string; quantidade: number; motivo: string }) {
+    if (!dto.loteId) throw new BadRequestException('Selecione um lote');
+    if (!dto.quantidade || Number(dto.quantidade) <= 0) {
+      throw new BadRequestException('Quantidade deve ser maior que zero');
+    }
+
+    const r = await this.lotesService.abaterDoLote(dto.loteId, Number(dto.quantidade));
+    await this.lotesService.recalcularSaldoItem(r.itemId);
+
+    const mov = await this.prisma.movimentacao.create({
+      data: {
+        tipo: 'DESCARTE',
+        observacao: dto.motivo,
+        usuarioId,
+        dataMovimentacao: new Date(),
+      },
+    });
+    await this.prisma.movimentacaoItem.create({
+      data: {
+        movimentacaoId: mov.id,
+        itemId: r.itemId,
+        loteId: dto.loteId,
+        quantidade: Number(dto.quantidade),
+        saldoAnterior: r.saldoAnterior,
+        saldoPosterior: r.saldoPosterior,
+      },
+    });
+    await this.prisma.logAuditoria.create({
+      data: { acao: 'DESCARTE', entidade: 'Movimentacao', entidadeId: mov.id, usuarioId,
+        detalhes: { lote: r.lote.codigoLote, motivo: dto.motivo } },
+    });
+    return this.prisma.movimentacao.findUnique({
+      where: { id: mov.id },
+      include: { itens: { include: { item: true, lote: true } } },
+    });
+  }
+
+  // ═══════════════ ESTORNO ═══════════════
+  async estornar(usuarioId: string, idMovimentacao: string) {
+    const mov = await this.prisma.movimentacao.findUnique({
+      where: { id: idMovimentacao },
+      include: { itens: true },
+    });
+    if (!mov) throw new NotFoundException('Movimentação não encontrada');
+    if (mov.tipo === 'ESTORNO') throw new BadRequestException('Não é possível estornar um estorno');
+
+    // Verifica se ja foi estornada
+    const jaEstornada = await this.prisma.movimentacao.findFirst({
+      where: { estornoDeId: idMovimentacao },
+    });
+    if (jaEstornada) throw new BadRequestException('Esta movimentação já foi estornada');
+
     return this.prisma.$transaction(async (tx) => {
-      const original = await tx.movimentacao.findUnique({
-        where: { id: movimentacaoId },
-        include: { itens: true, estornadoPor: true },
-      });
-      if (!original) throw new NotFoundException('Movimentacao nao encontrada');
-      if (original.tipo === 'ESTORNO') throw new BadRequestException('Nao e possivel estornar um estorno');
-      if (original.estornadoPor) throw new BadRequestException('Movimentacao ja estornada');
-
+      // Cria movimentacao de estorno
       const estorno = await tx.movimentacao.create({
-        data: { tipo: 'ESTORNO', estornoDeId: original.id, usuarioId,
-          observacao: `Estorno da movimentacao ${original.id}` },
+        data: {
+          tipo: 'ESTORNO',
+          usuarioId,
+          dataMovimentacao: new Date(),
+          observacao: `Estorno de ${mov.tipo}`,
+          estornoDeId: mov.id,
+        },
       });
 
-      for (const mi of original.itens) {
-        const item = await tx.item.findUnique({ where: { id: mi.itemId } });
-        const fator = original.tipo === 'ENTRADA' ? -1 : 1;
-        const saldoAnterior = Number(item.saldoAtual);
-        const saldoPosterior = saldoAnterior + fator * Number(mi.quantidade);
-        if (saldoPosterior < 0) throw new BadRequestException(`Estorno deixaria saldo negativo em: ${item.nome}`);
+      const itensRecalc = new Set<string>();
+      for (const mi of mov.itens) {
+        if (mov.tipo === 'ENTRADA' && mi.loteId) {
+          // Desfaz entrada: desativa o lote criado (nao apaga pra manter rastreio)
+          await tx.lote.update({
+            where: { id: mi.loteId },
+            data: { ativo: false, quantidadeAtual: 0 },
+          });
+        } else if ((mov.tipo === 'SAIDA' || mov.tipo === 'DESCARTE') && mi.loteId) {
+          // Devolve qtd ao lote
+          const lote = await tx.lote.findUnique({ where: { id: mi.loteId } });
+          if (lote) {
+            await tx.lote.update({
+              where: { id: mi.loteId },
+              data: {
+                quantidadeAtual: Number(lote.quantidadeAtual) + Number(mi.quantidade),
+                ativo: true,
+              },
+            });
+          }
+        }
+        itensRecalc.add(mi.itemId);
 
         await tx.movimentacaoItem.create({
-          data: { movimentacaoId: estorno.id, itemId: mi.itemId, quantidade: mi.quantidade, saldoAnterior, saldoPosterior },
+          data: {
+            movimentacaoId: estorno.id,
+            itemId: mi.itemId,
+            loteId: mi.loteId,
+            quantidade: mi.quantidade,
+            saldoAnterior: mi.saldoPosterior,
+            saldoPosterior: mi.saldoAnterior,
+          },
         });
-        await tx.item.update({ where: { id: mi.itemId }, data: { saldoAtual: saldoPosterior } });
+      }
+
+      // Recalcula saldo dos itens afetados
+      for (const itemId of itensRecalc) {
+        const agg = await tx.lote.aggregate({
+          where: { itemId, ativo: true },
+          _sum: { quantidadeAtual: true },
+        });
+        await tx.item.update({
+          where: { id: itemId },
+          data: { saldoAtual: Number(agg._sum.quantidadeAtual || 0) },
+        });
       }
 
       await tx.logAuditoria.create({
-        data: { acao: 'ESTORNO', entidade: 'Movimentacao', entidadeId: original.id, usuarioId },
+        data: { acao: 'ESTORNO', entidade: 'Movimentacao', entidadeId: estorno.id, usuarioId,
+          detalhes: { estornoDe: idMovimentacao, tipoOriginal: mov.tipo } },
       });
+
       return estorno;
     });
   }

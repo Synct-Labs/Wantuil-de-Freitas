@@ -226,18 +226,35 @@ export class ItensService {
     return { mensagem: 'Item excluido permanentemente', excluido: true };
   }
 
+  /**
+   * Retorna alertas atuais. Validade agora vem dos LOTES (cada lote tem
+   * sua propria validade); estoque minimo continua sendo por ITEM (agregado).
+   */
   async alertas() {
-    const itens = await this.prisma.item.findMany({ where: { ativo: true }, include: { setor: true } });
-    const comStatus = itens.map((i) => ({
-      ...i,
-      statusValidade: calcularStatusValidade(i.dataValidade),
-      abaixoMinimo: Number(i.saldoAtual) <= Number(i.estoqueMinimo),
+    // 1. Validade: olha cada LOTE ativo
+    const lotes = await this.prisma.lote.findMany({
+      where: { ativo: true, quantidadeAtual: { gt: 0 } },
+      include: { item: { include: { setor: true } } },
+    });
+    const lotesComStatus = lotes.map((l) => ({
+      ...l,
+      statusValidade: calcularStatusValidade(l.dataValidade),
     }));
+
+    // 2. Estoque minimo: agrega por ITEM (saldoAtual e a soma dos lotes)
+    const itens = await this.prisma.item.findMany({
+      where: { ativo: true, estoqueMinimo: { gt: 0 } },
+      include: { setor: true },
+    });
+    const abaixoMinimo = itens
+      .filter((i) => Number(i.saldoAtual) <= Number(i.estoqueMinimo))
+      .map((i) => ({ ...i, abaixoMinimo: true }));
+
     return {
-      descarte: comStatus.filter((i) => i.statusValidade === 'DESCARTE'),
-      adicional: comStatus.filter((i) => i.statusValidade === 'ADICIONAL'),
-      proximoVencimento: comStatus.filter((i) => i.statusValidade === 'PROXIMO'),
-      abaixoMinimo: comStatus.filter((i) => i.abaixoMinimo),
+      descarte: lotesComStatus.filter((l) => l.statusValidade === 'DESCARTE'),
+      adicional: lotesComStatus.filter((l) => l.statusValidade === 'ADICIONAL'),
+      proximoVencimento: lotesComStatus.filter((l) => l.statusValidade === 'PROXIMO'),
+      abaixoMinimo,
     };
   }
 }

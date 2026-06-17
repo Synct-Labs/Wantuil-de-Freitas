@@ -68,52 +68,56 @@ export class NotificacoesService {
 
   // ═══════════ VERIFICACAO COMPLETA (gera notificacoes pendentes do estado atual) ═══════════
   /**
-   * Escaneia todos os itens e cria notificacoes pendentes para:
-   * - Itens proximos do vencimento (≤30 dias)
-   * - Itens no periodo adicional (vencidos ate 6 meses)
-   * - Itens para descarte (>6 meses pos-vencimento)
-   * - Itens abaixo do estoque minimo
-   *
+   * Escaneia LOTES ativos + ITENS abaixo do mínimo e cria notificações.
+   * Validade é por lote; estoque mínimo é por item (agregado).
    * Idempotente: nao duplica notificacoes ja criadas nas ultimas 24h.
    */
   async verificarItens() {
-    const itens = await this.prisma.item.findMany({
-      where: { ativo: true },
-      include: { setor: true },
+    // 1. LOTES com problema de validade
+    const lotes = await this.prisma.lote.findMany({
+      where: { ativo: true, quantidadeAtual: { gt: 0 } },
+      include: { item: true },
     });
 
     let criadas = 0;
-    for (const i of itens) {
-      const status = calcularStatusValidade(i.dataValidade);
-      const valFmt = i.dataValidade ? new Date(i.dataValidade).toLocaleDateString('pt-BR') : '';
+    for (const l of lotes) {
+      const status = calcularStatusValidade(l.dataValidade);
+      const valFmt = l.dataValidade ? new Date(l.dataValidade).toLocaleDateString('pt-BR') : '';
+      const nomeProduto = l.item.nome;
 
       if (status === 'DESCARTE') {
         const n = await this.criarSeNova(
           'DESCARTE',
-          `Descarte obrigatório: ${i.nome}`,
-          `O item "${i.nome}" venceu há mais de 6 meses (${valFmt}) e deve ser descartado. Saldo atual: ${i.saldoAtual} ${i.unidadeMedida}.`,
+          `Descarte obrigatório: ${nomeProduto} (lote ${l.codigoLote})`,
+          `O lote ${l.codigoLote} de "${nomeProduto}" venceu há mais de 6 meses (${valFmt}). Saldo: ${l.quantidadeAtual} ${l.item.unidadeMedida}.`,
           'CRITICO',
         );
         if (n) criadas++;
       } else if (status === 'ADICIONAL') {
         const n = await this.criarSeNova(
           'ADICIONAL',
-          `Vencido (período adicional): ${i.nome}`,
-          `O item "${i.nome}" venceu em ${valFmt} e está no período adicional de 6 meses. Saldo: ${i.saldoAtual} ${i.unidadeMedida}.`,
+          `Vencido (período adicional): ${nomeProduto} (${l.codigoLote})`,
+          `O lote ${l.codigoLote} de "${nomeProduto}" venceu em ${valFmt}. Saldo: ${l.quantidadeAtual} ${l.item.unidadeMedida}.`,
           'AVISO',
         );
         if (n) criadas++;
       } else if (status === 'PROXIMO') {
         const n = await this.criarSeNova(
           'PROXIMO_VENCIMENTO',
-          `Próximo do vencimento: ${i.nome}`,
-          `O item "${i.nome}" vence em ${valFmt}. Saldo: ${i.saldoAtual} ${i.unidadeMedida}.`,
+          `Próximo do vencimento: ${nomeProduto} (${l.codigoLote})`,
+          `O lote ${l.codigoLote} de "${nomeProduto}" vence em ${valFmt}. Saldo: ${l.quantidadeAtual} ${l.item.unidadeMedida}.`,
           'AVISO',
         );
         if (n) criadas++;
       }
+    }
 
-      if (Number(i.saldoAtual) <= Number(i.estoqueMinimo) && Number(i.estoqueMinimo) > 0) {
+    // 2. ITENS abaixo do estoque mínimo
+    const itens = await this.prisma.item.findMany({
+      where: { ativo: true, estoqueMinimo: { gt: 0 } },
+    });
+    for (const i of itens) {
+      if (Number(i.saldoAtual) <= Number(i.estoqueMinimo)) {
         const n = await this.criarSeNova(
           'ABAIXO_MINIMO',
           `Estoque abaixo do mínimo: ${i.nome}`,
@@ -124,8 +128,8 @@ export class NotificacoesService {
       }
     }
 
-    this.logger.log(`Verificacao concluida: ${criadas} notificacoes criadas`);
-    return { itensVerificados: itens.length, notificacoesCriadas: criadas };
+    this.logger.log(`Verificacao concluida: ${criadas} notificacoes criadas (${lotes.length} lotes, ${itens.length} itens analisados)`);
+    return { lotesVerificados: lotes.length, itensVerificados: itens.length, notificacoesCriadas: criadas };
   }
 
   // ═══════════ EMAIL ═══════════
