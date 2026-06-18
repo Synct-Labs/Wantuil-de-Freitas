@@ -3,6 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { calcularStatusValidade } from '../itens/itens.service';
 import { Resend } from 'resend';
+import { fmtData, fmtDataHora } from '../common/data-fuso';
 
 type Severidade = 'INFO' | 'AVISO' | 'CRITICO';
 
@@ -82,7 +83,7 @@ export class NotificacoesService {
     let criadas = 0;
     for (const l of lotes) {
       const status = calcularStatusValidade(l.dataValidade);
-      const valFmt = l.dataValidade ? new Date(l.dataValidade).toLocaleDateString('pt-BR') : '';
+      const valFmt = l.dataValidade ? fmtData(l.dataValidade) : '';
       const nomeProduto = l.item.nome;
 
       if (status === 'DESCARTE') {
@@ -158,7 +159,7 @@ export class NotificacoesService {
     try {
       await this.enviarEmail(
         'Teste de notificação - Wantuil',
-        `Olá!\n\nEste é um e-mail de teste do Sistema de Almoxarifado da Wantuil de Freitas.\n\nSe você está lendo esta mensagem, o envio de e-mails está funcionando corretamente.\n\nEnviado em: ${new Date().toLocaleString('pt-BR')}`,
+        `Olá!\n\nEste é um e-mail de teste do Sistema de Almoxarifado da Wantuil de Freitas.\n\nSe você está lendo esta mensagem, o envio de e-mails está funcionando corretamente.\n\nEnviado em: ${fmtDataHora(new Date())}`,
       );
       return { sucesso: true, mensagem: `E-mail enviado para ${process.env.EMAIL_NOTIFICACOES}` };
     } catch (e: any) {
@@ -195,11 +196,11 @@ export class NotificacoesService {
 
     const totalAlertas = proximos.length + adicionais.length + descartes.length + abaixoMinimo.length;
     const fmt = (i: any) =>
-      `- ${i.nome} (saldo: ${i.saldoAtual} ${i.unidadeMedida}${i.dataValidade ? `, val: ${new Date(i.dataValidade).toLocaleDateString('pt-BR')}` : ''})`;
+      `- ${i.nome} (saldo: ${i.saldoAtual} ${i.unidadeMedida}${i.dataValidade ? `, val: ${fmtData(i.dataValidade)}` : ''})`;
 
     const corpo = [
       `RESUMO SEMANAL DO ALMOXARIFADO`,
-      `Data: ${new Date().toLocaleDateString('pt-BR')}`,
+      `Data: ${fmtData(new Date())}`,
       ``,
       `Total de alertas: ${totalAlertas}`,
       ``,

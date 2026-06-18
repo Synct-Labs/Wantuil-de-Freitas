@@ -7,6 +7,7 @@ import { LotesService } from '../lotes/lotes.service';
 import PDFDocument = require('pdfkit');
 import * as fs from 'fs';
 import * as path from 'path';
+import { fmtData, fmtDataHora } from '../common/data-fuso';
 
 @Injectable()
 export class EventosService {
@@ -332,8 +333,8 @@ export class EventosService {
       PLANEJADO: 'Planejado', EM_ANDAMENTO: 'Em andamento',
       FINALIZADO: 'Finalizado', CANCELADO: 'Cancelado',
     };
-    const dataIni = new Date(ev.dataInicio).toLocaleDateString('pt-BR');
-    const dataFim = ev.dataFim ? new Date(ev.dataFim).toLocaleDateString('pt-BR') : null;
+    const dataIni = fmtData(ev.dataInicio);
+    const dataFim = ev.dataFim ? fmtData(ev.dataFim) : null;
     const info = [
       `Status: ${statusLabel[ev.status]}`,
       dataFim ? `Período: ${dataIni} a ${dataFim}` : `Data: ${dataIni}`,
@@ -395,21 +396,30 @@ export class EventosService {
 
       doc.font('Helvetica').fontSize(8.5);
       ev.reservas.forEach((r: any, idx: number) => {
-        const yL = doc.y;
-        if (idx % 2 === 0) doc.rect(doc.page.margins.left, yL, totalW, 16).fill('#F4F7F8');
-        let xC = doc.page.margins.left;
         const valores = [
           r.lote.codigoLote, r.lote.item.nome,
           `${r.quantidadeReservada} ${r.lote.item.unidadeMedida}`,
           `${r.quantidadeConsumida} ${r.lote.item.unidadeMedida}`,
           `${r.quantidadeRestante} ${r.lote.item.unidadeMedida}`,
         ];
+        // Altura dinamica: mede o nome do item (que pode quebrar em 2 linhas)
+        const hNome = doc.heightOfString(r.lote.item.nome, { width: cols[1].w * fator - 12 });
+        const alturaL = Math.min(32, Math.max(16, Math.ceil(hNome) + 6));
+
+        if (doc.y + alturaL > doc.page.height - 60) doc.addPage();
+        const yL = doc.y;
+        if (idx % 2 === 0) doc.rect(doc.page.margins.left, yL, totalW, alturaL).fill('#F4F7F8');
+        let xC = doc.page.margins.left;
         doc.fillColor('#1A2A2C');
         valores.forEach((v, i) => {
-          doc.text(v, xC + 6, yL + 4, { width: cols[i].w * fator - 12, lineBreak: false, ellipsis: true });
+          doc.text(v, xC + 6, yL + 4, {
+            width: cols[i].w * fator - 12,
+            height: alturaL - 4,
+            ellipsis: true,
+          });
           xC += cols[i].w * fator;
         });
-        doc.y = yL + 16;
+        doc.y = yL + alturaL;
       });
       doc.moveDown(0.6);
     }
@@ -440,23 +450,31 @@ export class EventosService {
       doc.font('Helvetica').fontSize(8.5);
       let zebra = 0;
       ev.movimentacoes.forEach((mov: any) => {
-        const data = new Date(mov.dataMovimentacao).toLocaleDateString('pt-BR');
+        const data = fmtData(mov.dataMovimentacao);
         const resp = mov.usuario?.nome || '—';
         mov.itens.forEach((mi: any) => {
-          if (doc.y > doc.page.height - 60) { doc.addPage(); }
-          const yL = doc.y;
-          if (zebra++ % 2 === 0) doc.rect(doc.page.margins.left, yL, totalW, 16).fill('#F4F7F8');
-          let xC = doc.page.margins.left;
           const valores = [
             data, mi.lote?.codigoLote || '—', mi.item.nome,
             `${mi.quantidade} ${mi.item.unidadeMedida}`, resp,
           ];
+          // Altura dinamica: pelo nome do item (col 2)
+          const hNome = doc.heightOfString(mi.item.nome, { width: cols[2].w * fator - 12 });
+          const alturaL = Math.min(32, Math.max(16, Math.ceil(hNome) + 6));
+
+          if (doc.y + alturaL > doc.page.height - 60) doc.addPage();
+          const yL = doc.y;
+          if (zebra++ % 2 === 0) doc.rect(doc.page.margins.left, yL, totalW, alturaL).fill('#F4F7F8');
+          let xC = doc.page.margins.left;
           doc.fillColor('#1A2A2C');
           valores.forEach((v, i) => {
-            doc.text(String(v), xC + 6, yL + 4, { width: cols[i].w * fator - 12, lineBreak: false, ellipsis: true });
+            doc.text(String(v), xC + 6, yL + 4, {
+              width: cols[i].w * fator - 12,
+              height: alturaL - 4,
+              ellipsis: true,
+            });
             xC += cols[i].w * fator;
           });
-          doc.y = yL + 16;
+          doc.y = yL + alturaL;
         });
       });
     }
@@ -464,7 +482,7 @@ export class EventosService {
     // Rodape
     const yR = doc.page.height - doc.page.margins.bottom + 20;
     doc.fontSize(7.5).fillColor('#8A9598').font('Helvetica')
-      .text(`Emitido em ${new Date().toLocaleString('pt-BR')} · Associação Espírita Wantuil de Freitas`,
+      .text(`Emitido em ${fmtDataHora(new Date())} · Associação Espírita Wantuil de Freitas`,
         doc.page.margins.left, yR, {
           width: doc.page.width - doc.page.margins.left - doc.page.margins.right, align: 'center',
         });

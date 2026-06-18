@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { fmtData } from '../common/data-fuso';
 import { PrismaService } from '../prisma/prisma.service';
 import { calcularStatusValidade } from '../itens/itens.service';
 import * as ExcelJS from 'exceljs';
@@ -490,7 +491,7 @@ export class RelatoriosService {
       const destino = m.doador?.nome || m.beneficiario?.nome || m.setor?.nome || '—';
       for (const mi of m.itens) {
         ws.addRow({
-          data: new Date(m.dataMovimentacao).toLocaleDateString('pt-BR'),
+          data: fmtData(m.dataMovimentacao),
           tipo: m.tipo,
           item: mi.item.nome,
           qtd: Number(mi.quantidade),
@@ -517,7 +518,7 @@ export class RelatoriosService {
     ];
     this.aplicarCabecalhoExcel(ws);
     for (const d of dados as any[]) {
-      ws.addRow({ ...d, ultimaDoacao: new Date(d.ultimaDoacao).toLocaleDateString('pt-BR') });
+      ws.addRow({ ...d, ultimaDoacao: fmtData(d.ultimaDoacao) });
     }
     return Buffer.from(await wb.xlsx.writeBuffer());
   }
@@ -537,7 +538,7 @@ export class RelatoriosService {
     ];
     this.aplicarCabecalhoExcel(ws);
     for (const d of dados as any[]) {
-      ws.addRow({ ...d, ultimaRetirada: new Date(d.ultimaRetirada).toLocaleDateString('pt-BR') });
+      ws.addRow({ ...d, ultimaRetirada: fmtData(d.ultimaRetirada) });
     }
     return Buffer.from(await wb.xlsx.writeBuffer());
   }

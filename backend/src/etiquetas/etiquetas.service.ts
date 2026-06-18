@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import PDFDocument = require('pdfkit');
+import { fmtData } from '../common/data-fuso';
 
 // Code 128-B
 const PATTERNS = [
@@ -54,9 +55,9 @@ export class EtiquetasService {
     const done = new Promise<Buffer>((res) => doc.on('end', () => res(Buffer.concat(chunks))));
 
     const codigo = lote.codigoLote;
-    const entrada = new Date(lote.dataEntrada).toLocaleDateString('pt-BR');
+    const entrada = fmtData(lote.dataEntrada);
     const validade = lote.dataValidade
-      ? new Date(lote.dataValidade).toLocaleDateString('pt-BR')
+      ? fmtData(lote.dataValidade)
       : 'S/VALIDADE';
 
     for (let n = 0; n < quantidade; n++) {

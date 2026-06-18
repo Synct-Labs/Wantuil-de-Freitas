@@ -1,4 +1,5 @@
 import PDFDocument = require('pdfkit');
+import { fmtData, fmtDataHora } from '../common/data-fuso';
 
 interface Coluna {
   titulo: string;
@@ -97,7 +98,7 @@ export function gerarRelatorioPdf(opts: RelatorioPdfOpts): Promise<Buffer> {
 
       // Data e hora de emissao (direita)
       const agora = new Date();
-      const dataHora = agora.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+      const dataHora = fmtDataHora(agora);
       doc.fillColor(COR_TEXTO_SUAVE).fontSize(8).font('Helvetica')
         .text(`Emitido em ${dataHora}`,
           doc.page.margins.left, yInicial + 4,
@@ -168,22 +169,34 @@ export function gerarRelatorioPdf(opts: RelatorioPdfOpts): Promise<Buffer> {
 
       cabecalhoTabela();
 
-      // Linhas
+      // Linhas com altura dinamica (ate 2 linhas de texto por celula)
       doc.font('Helvetica').fontSize(9);
       let zebra = false;
       opts.linhas.forEach((row, _idx) => {
+        const yRow = doc.y;
+
+        // Mede a altura necessaria de cada celula e usa a maior
+        let alturaConteudoMax = 0;
+        opts.colunas.forEach((col) => {
+          const w = col.largura * larguraTotal;
+          const valorBruto = obterValor(row, col.campo);
+          const valor = col.formatar ? col.formatar(valorBruto, row) : String(valorBruto ?? '');
+          const h = doc.heightOfString(valor, { width: w - 8 });
+          if (h > alturaConteudoMax) alturaConteudoMax = h;
+        });
+        // Altura final: minimo 18, maximo ~36 (2 linhas), com padding
+        const alturaRow = Math.min(36, Math.max(18, Math.ceil(alturaConteudoMax) + 8));
+
         // Quebra de pagina?
-        if (doc.y > doc.page.height - 70) {
+        if (yRow + alturaRow > doc.page.height - 70) {
           doc.addPage();
           cabecalhoTabela();
           zebra = false;
         }
 
-        const yRow = doc.y;
-        const alturaRow = 18;
-
+        const y = doc.y;
         if (zebra) {
-          doc.rect(doc.page.margins.left, yRow, larguraTotal, alturaRow).fill(COR_ZEBRA);
+          doc.rect(doc.page.margins.left, y, larguraTotal, alturaRow).fill(COR_ZEBRA);
         }
 
         let x = doc.page.margins.left + 6;
@@ -192,12 +205,17 @@ export function gerarRelatorioPdf(opts: RelatorioPdfOpts): Promise<Buffer> {
           const w = col.largura * larguraTotal;
           const valorBruto = obterValor(row, col.campo);
           const valor = col.formatar ? col.formatar(valorBruto, row) : String(valorBruto ?? '');
-          doc.text(valor, x, yRow + 5,
-            { width: w - 8, align: col.alinhamento || 'left', ellipsis: true });
+          // Permite quebra de linha, ate 2 linhas, depois ellipsis
+          doc.text(valor, x, y + 5, {
+            width: w - 8,
+            height: alturaRow - 6,
+            align: col.alinhamento || 'left',
+            ellipsis: true,
+          });
           x += w;
         });
 
-        doc.y = yRow + alturaRow;
+        doc.y = y + alturaRow;
         zebra = !zebra;
       });
 
@@ -261,12 +279,12 @@ function obterValor(obj: any, caminho: string): any {
 function formatarData(d: string | Date): string {
   if (!d) return '—';
   const dt = typeof d === 'string' ? new Date(d) : d;
-  return dt.toLocaleDateString('pt-BR');
+  return fmtData(dt);
 }
 
 export const formatadores = {
-  data: (v: any) => v ? new Date(v).toLocaleDateString('pt-BR') : '—',
-  dataHora: (v: any) => v ? new Date(v).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—',
+  data: (v: any) => fmtData(v),
+  dataHora: (v: any) => fmtDataHora(v),
   numero: (v: any) => v == null ? '—' : Number(v).toLocaleString('pt-BR'),
   numero2: (v: any) => v == null ? '—' : Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
 };
