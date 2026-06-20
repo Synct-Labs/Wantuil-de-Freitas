@@ -15,4 +15,7 @@ export class SistemaController {
 
   @Post('reset-para-lotes')
   resetParaLotes() { return this.service.resetParaUsarLotes(); }
+
+  @Post('limpar-exemplos')
+  limparExemplos() { return this.service.limparDadosExemplo(); }
 }

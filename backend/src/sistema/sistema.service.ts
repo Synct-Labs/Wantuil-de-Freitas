@@ -57,6 +57,56 @@ export class SistemaService {
   }
 
   /**
+   * Limpa categorias e setores que sobraram do seed e que ainda nao foram usados.
+   *
+   * Seguranca: NUNCA apaga uma categoria que tenha itens vinculados, nem
+   * um setor com movimentacoes ou lotes. Se voce ja cadastrou item em
+   * "Alimentos", essa categoria sera preservada.
+   */
+  async limparDadosExemplo() {
+    const CATEGORIAS_EXEMPLO = ['Alimentos', 'Higiene', 'Limpeza', 'Vestuario', 'Medicamentos', 'Outros'];
+    const SETORES_EXEMPLO = ['Estoque Geral', 'Cozinha', 'Enfermaria', 'Abrigo'];
+
+    const apagadas: { categorias: string[]; setores: string[] } = { categorias: [], setores: [] };
+    const mantidos: { categorias: string[]; setores: string[] } = { categorias: [], setores: [] };
+
+    for (const nome of CATEGORIAS_EXEMPLO) {
+      const cat = await this.prisma.categoria.findUnique({
+        where: { nome },
+        include: { _count: { select: { itens: true } } },
+      });
+      if (!cat) continue;
+      if (cat._count.itens === 0) {
+        await this.prisma.categoria.delete({ where: { id: cat.id } });
+        apagadas.categorias.push(nome);
+      } else {
+        mantidos.categorias.push(`${nome} (${cat._count.itens} item${cat._count.itens > 1 ? 's' : ''})`);
+      }
+    }
+
+    for (const nome of SETORES_EXEMPLO) {
+      const setor = await this.prisma.setor.findUnique({
+        where: { nome },
+        include: { _count: { select: { movimentacoes: true, lotes: true } } },
+      });
+      if (!setor) continue;
+      const emUso = setor._count.movimentacoes + setor._count.lotes;
+      if (emUso === 0) {
+        await this.prisma.setor.delete({ where: { id: setor.id } });
+        apagadas.setores.push(nome);
+      } else {
+        mantidos.setores.push(`${nome} (em uso)`);
+      }
+    }
+
+    this.logger.log(`Limpeza: ${apagadas.categorias.length} categorias e ${apagadas.setores.length} setores apagados`);
+    return {
+      mensagem: `Limpeza concluída: ${apagadas.categorias.length} categoria(s) e ${apagadas.setores.length} setor(es) removidos.`,
+      apagadas, mantidos,
+    };
+  }
+
+  /**
    * Estatisticas gerais do sistema (util pra dashboard admin)
    */
   async estatisticas() {
