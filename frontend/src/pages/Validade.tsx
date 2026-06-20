@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import api from '../api/client';
 import Icon, { IconName } from '../components/Icon';
+import { useToast } from '../components/Toast';
 import { fmtData } from '../utils/format';
 
 export default function Validade() {
+  const toast = useToast();
   const [dados, setDados] = useState<any>(null);
 
   useEffect(() => { carregar(); }, []);
@@ -14,10 +16,10 @@ export default function Validade() {
     if (!motivo) return;
     try {
       await api.post('/movimentacoes/descarte', { loteId, quantidade: qtd, motivo });
-      alert('Descarte registrado.');
+      toast.sucesso('Descarte registrado', `${qtd} un de ${nomeItem} (lote ${codigoLote})`);
       carregar();
     } catch (e: any) {
-      alert(e.response?.data?.message || 'Erro ao registrar descarte');
+      toast.erro('Erro ao registrar descarte', e.response?.data?.message || 'Tente novamente');
     }
   }
 

@@ -146,16 +146,24 @@ export default function NotificacoesBell() {
       </button>
 
       {aberto && (
-        <div style={{
-          position: 'absolute', top: '100%', right: 0, marginTop: 8,
-          width: 360, maxWidth: 'calc(100vw - 32px)',
-          background: 'var(--surface)',
-          borderRadius: 10,
-          boxShadow: '0 10px 30px rgba(0,0,0,0.18)',
-          border: '1px solid var(--border)',
-          zIndex: 1000,
-          maxHeight: 480, display: 'flex', flexDirection: 'column',
-        }}>
+        <div style={(() => {
+          // Posiciona em FIXED ancorado a viewport para nao ser cortado por
+          // overflow do topbar ou de containers ancestrais.
+          const rect = containerRef.current?.getBoundingClientRect();
+          const topo = (rect?.bottom ?? 56) + 8;
+          // Margem segura da borda direita
+          const direita = Math.max(8, window.innerWidth - (rect?.right ?? window.innerWidth));
+          return {
+            position: 'fixed' as const, top: topo, right: direita,
+            width: 360, maxWidth: 'calc(100vw - 16px)',
+            background: 'var(--surface)',
+            borderRadius: 10,
+            boxShadow: '0 10px 30px rgba(0,0,0,0.18)',
+            border: '1px solid var(--border)',
+            zIndex: 1000,
+            maxHeight: 'min(480px, calc(100vh - 80px))', display: 'flex', flexDirection: 'column' as const,
+          };
+        })()}>
           {/* Header */}
           <div style={{
             padding: '12px 16px', borderBottom: '1px solid var(--border)',

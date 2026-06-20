@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import api from '../api/client';
 import ScannerLote from '../components/ScannerLote';
 import Icon from '../components/Icon';
+import { useToast } from '../components/Toast';
 import { fmtData } from '../utils/format';
 
 interface LinhaLoteSaida {
@@ -15,6 +16,7 @@ interface LinhaLoteSaida {
 }
 
 export default function Saidas() {
+  const toast = useToast();
   const [destinoTipo, setDestinoTipo] = useState<'SETOR' | 'EVENTO'>('SETOR');
   const [destinoId, setDestinoId] = useState('');
   const [finalidade, setFinalidade] = useState('');
@@ -83,9 +85,15 @@ export default function Saidas() {
         setViolacoes(data.violacoes);
         return;
       }
+      // Monta resumo: "6 un de Coca-Cola + 2 un de Arroz" (max 2 itens visiveis)
+      const itens = linhas.slice(0, 2).map(l => `${l.quantidade} ${l.unidade} de ${l.itemNome}`).join(' + ');
+      const sufixo = linhas.length > 2 ? ` + mais ${linhas.length - 2} item(s)` : '';
+      const destinoNome = destinoTipo === 'SETOR'
+        ? setores.find(s => s.id === destinoId)?.nome
+        : eventos.find(e => e.id === destinoId)?.nome;
+      toast.sucesso('Saída registrada', `${itens}${sufixo}${destinoNome ? ` → ${destinoNome}` : ''}`);
       setLinhas([]); setDestinoId(''); setFinalidade(''); setViolacoes([]);
       carregarMovs();
-      alert('Saída registrada com sucesso.');
     } catch (e: any) {
       setErro(e.response?.data?.message || 'Erro ao registrar');
     } finally { setSalvando(false); }
