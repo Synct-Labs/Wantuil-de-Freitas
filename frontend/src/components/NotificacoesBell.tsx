@@ -152,40 +152,36 @@ export default function NotificacoesBell() {
 
       {aberto && createPortal(
         <div ref={dropdownRef} style={(() => {
-          // Posiciona em FIXED ancorado a viewport. Renderizado via Portal
-          // direto em document.body para escapar de containers ancestrais
-          // que tenham transform/filter/will-change (que criariam um containing
-          // block local e impediriam o ancoramento na viewport).
+          // Renderizado via Portal direto em document.body para escapar de
+          // qualquer ancestral com transform/filter/will-change que crie um
+          // containing block local.
           const rect = containerRef.current?.getBoundingClientRect();
           const vw = window.innerWidth;
           const topo = (rect?.bottom ?? 56) + 8;
 
-          // Em telas muito estreitas, ocupa quase toda a largura (8px de cada lado)
-          if (vw <= 480) {
-            return {
-              position: 'fixed' as const, top: topo, left: 8, right: 8,
-              background: 'var(--surface)',
-              borderRadius: 10,
-              boxShadow: '0 10px 30px rgba(0,0,0,0.18)',
-              border: '1px solid var(--border)',
-              zIndex: 10000,
-              maxHeight: 'calc(100vh - 80px)',
-              display: 'flex', flexDirection: 'column' as const,
-            };
-          }
+          // Detecta de que lado da tela o botao esta e abre o dropdown na
+          // mesma direcao. Mais previsivel que calcular right sempre.
+          const larguraPainel = 360;
+          const centroBotao = ((rect?.left ?? 0) + (rect?.right ?? 0)) / 2;
+          const botaoNaEsquerda = centroBotao < vw / 2;
 
-          // Desktop/tablet: alinha pelo lado direito do botao com margem
-          const direita = Math.max(8, vw - (rect?.right ?? vw));
-          return {
-            position: 'fixed' as const, top: topo, right: direita,
-            width: 360, maxWidth: 'calc(100vw - 16px)',
+          const base = {
+            position: 'fixed' as const, top: topo,
+            width: larguraPainel,
+            maxWidth: 'calc(100vw - 16px)',
             background: 'var(--surface)',
             borderRadius: 10,
             boxShadow: '0 10px 30px rgba(0,0,0,0.18)',
             border: '1px solid var(--border)',
             zIndex: 10000,
-            maxHeight: 'min(480px, calc(100vh - 80px))', display: 'flex', flexDirection: 'column' as const,
+            maxHeight: 'min(480px, calc(100vh - 80px))',
+            display: 'flex' as const,
+            flexDirection: 'column' as const,
           };
+
+          return botaoNaEsquerda
+            ? { ...base, left: Math.max(8, rect?.left ?? 8) }
+            : { ...base, right: Math.max(8, vw - (rect?.right ?? vw)) };
         })()}>
           {/* Header */}
           <div style={{
