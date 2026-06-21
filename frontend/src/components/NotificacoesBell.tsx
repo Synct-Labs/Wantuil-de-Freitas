@@ -175,17 +175,37 @@ export default function NotificacoesBell() {
           }
 
           // Desktop/tablet: alinha pelo lado direito do botao com margem
-          const direita = Math.max(8, vw - (rect?.right ?? vw));
-          return {
-            position: 'fixed' as const, top: topo, right: direita,
-            width: 360, maxWidth: 'calc(100vw - 16px)',
-            background: 'var(--surface)',
-            borderRadius: 10,
-            boxShadow: '0 10px 30px rgba(0,0,0,0.18)',
-            border: '1px solid var(--border)',
-            zIndex: 10000,
-            maxHeight: 'min(480px, calc(100vh - 80px))', display: 'flex', flexDirection: 'column' as const,
-          };
+          const larguraPainel = 360;
+const centroBotao = ((rect?.left ?? 0) + (rect?.right ?? 0)) / 2;
+const botaoNaEsquerda = centroBotao < vw / 2;
+
+if (botaoNaEsquerda) {
+  return {
+    position: 'fixed' as const,
+    top: topo,
+    left: Math.max(8, rect?.left ?? 8),
+    width: larguraPainel,
+    maxWidth: 'calc(100vw - 16px)',
+    background: 'var(--surface)',
+    borderRadius: 10,
+    boxShadow: '0 10px 30px rgba(0,0,0,0.18)',
+    border: '1px solid var(--border)',
+    zIndex: 10000,
+  };
+}
+
+return {
+  position: 'fixed' as const,
+  top: topo,
+  right: Math.max(8, vw - (rect?.right ?? vw)),
+  width: larguraPainel,
+  maxWidth: 'calc(100vw - 16px)',
+  background: 'var(--surface)',
+  borderRadius: 10,
+  boxShadow: '0 10px 30px rgba(0,0,0,0.18)',
+  border: '1px solid var(--border)',
+  zIndex: 10000,
+};
         })()}>
           {/* Header */}
           <div style={{
