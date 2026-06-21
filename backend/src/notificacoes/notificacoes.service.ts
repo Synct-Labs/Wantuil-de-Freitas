@@ -152,19 +152,21 @@ export class NotificacoesService {
 
   async diagnosticoEmail() {
     const tem_api_key = !!process.env.RESEND_API_KEY;
-    const tem_from = !!process.env.EMAIL_FROM;
     const dest = await this.destinatarios();
+    const emailFrom = process.env.EMAIL_FROM || 'Almoxarifado <onboarding@resend.dev>';
+    const usandoDominioPadrao = emailFrom.includes('onboarding@resend.dev');
+
     return {
       configurado: tem_api_key && dest.emails.length > 0,
       detalhes: {
         RESEND_API_KEY: tem_api_key ? 'OK (configurada)' : 'FALTANDO — configure no .env',
-        EMAIL_FROM: process.env.EMAIL_FROM || '(usando padrão Almoxarifado <onboarding@resend.dev>)',
+        EMAIL_FROM: emailFrom + (usandoDominioPadrao ? ' ⚠ domínio padrão (limitado)' : ' ✓'),
         DESTINATARIOS: dest.emails.length === 0
           ? 'FALTANDO — nenhum usuário ativo com "Receber e-mail" marcado'
           : `${dest.emails.length} usuário(s): ${dest.nomes.join(', ')}`,
       },
-      observacao: !process.env.EMAIL_FROM
-        ? 'Atenção: usando domínio padrão do Resend (onboarding@resend.dev). Esse domínio só envia para o e-mail da conta que criou no resend.com. Para enviar para outros destinatários, valide um domínio próprio em resend.com → Domains.'
+      observacao: usandoDominioPadrao
+        ? 'ATENÇÃO: o domínio padrão "onboarding@resend.dev" só entrega para o e-mail da conta criada em resend.com. Outros destinatários são aceitos mas DESCARTADOS silenciosamente pelo Resend. Para enviar a todos, valide um domínio próprio (syncontrol.cloud) em resend.com → Domains e mude o EMAIL_FROM no .env.'
         : null,
     };
   }
@@ -208,19 +210,38 @@ export class NotificacoesService {
     if (dest.emails.length === 0) {
       throw new Error('Nenhum usuário ativo com "Receber notificações" marcado');
     }
-    // Usa BCC pra preservar privacidade dos destinatarios entre si.
-    // O campo "to" recebe o e-mail do remetente como placeholder.
     const from = process.env.EMAIL_FROM || 'Almoxarifado <onboarding@resend.dev>';
-    // Extrai o endereco do EMAIL_FROM (pode estar no formato "Nome <email>")
-    const fromEmail = (from.match(/<([^>]+)>/)?.[1]) || from;
-    await this.resend.emails.send({
-      from,
-      to: [fromEmail],
-      bcc: dest.emails,
-      subject: assunto,
-      text: corpo,
-    });
-    this.logger.log(`Email enviado para ${dest.emails.length} destinatario(s)`);
+
+    // Envia 1 email por destinatario.
+    // Motivo: o Resend com dominio padrao (onboarding@resend.dev) so entrega
+    // para o e-mail da conta. Usando BCC, ele aceita o envio (retorna 200)
+    // mas descarta silenciosamente os destinatarios. Enviar 1 por 1 deixa
+    // claro qual destinatario falhou, e funciona melhor com dominio proprio.
+    const erros: string[] = [];
+    let enviados = 0;
+    for (const email of dest.emails) {
+      try {
+        await this.resend.emails.send({
+          from,
+          to: [email],
+          subject: assunto,
+          text: corpo,
+        });
+        enviados++;
+      } catch (e: any) {
+        const det = e?.response?.body?.message || e?.message || 'erro desconhecido';
+        erros.push(`${email}: ${det}`);
+        this.logger.error(`Falha ao enviar para ${email}: ${det}`);
+      }
+    }
+    this.logger.log(`Email: ${enviados}/${dest.emails.length} enviados`);
+    if (enviados === 0) {
+      throw new Error(`Nenhum e-mail foi entregue. Detalhes: ${erros.join(' | ')}`);
+    }
+    if (erros.length > 0) {
+      // Sucesso parcial. Loga mas nao falha.
+      this.logger.warn(`Sucesso parcial: ${erros.length} falhas. ${erros.join(' | ')}`);
+    }
   }
 
   // ═══════════ CRON: Resumo semanal (sábado 07h Cuiabá = 11h UTC) ═══════════
