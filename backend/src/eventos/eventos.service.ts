@@ -353,11 +353,14 @@ export class EventosService {
     const totalConsumido = ev.reservas.reduce((s: number, r: any) => s + Number(r.quantidadeConsumida), 0);
     const totalRestante = totalReservado - totalConsumido;
 
+    const excedente = totalRestante < 0;
     const kpis = [
-      { label: 'Itens reservados', val: ev.reservas.length },
-      { label: 'Total reservado', val: totalReservado.toFixed(0) },
-      { label: 'Total consumido', val: totalConsumido.toFixed(0) },
-      { label: 'Restante / liberado', val: totalRestante.toFixed(0) },
+      { label: 'Itens reservados', val: ev.reservas.length, cor: '#1E3668' },
+      { label: 'Total reservado', val: totalReservado.toFixed(0), cor: '#1E3668' },
+      { label: 'Total consumido', val: totalConsumido.toFixed(0), cor: '#1E3668' },
+      excedente
+        ? { label: 'Excedente consumido', val: Math.abs(totalRestante).toFixed(0), cor: '#C03A2B' }
+        : { label: 'Restante / liberado', val: totalRestante.toFixed(0), cor: '#1E3668' },
     ];
 
     const yKpi = doc.y;
@@ -367,14 +370,20 @@ export class EventosService {
       doc.roundedRect(x, yKpi, wKpi, 50, 5).fillAndStroke('#E8F3F4', '#D9E3E5');
       doc.fillColor(COR_TEXTO_SUAVE).fontSize(8).font('Helvetica')
         .text(k.label.toUpperCase(), x + 8, yKpi + 8, { width: wKpi - 16 });
-      doc.fillColor('#1E3668').fontSize(20).font('Helvetica-Bold')
+      doc.fillColor(k.cor).fontSize(20).font('Helvetica-Bold')
         .text(String(k.val), x + 8, yKpi + 22, { width: wKpi - 16 });
     });
     doc.y = yKpi + 62;
+    // Reseta cursor X para a margem esquerda (KPIs deixam o cursor a direita
+    // com largura limitada, e isso quebra titulos de secao subsequentes).
+    doc.x = doc.page.margins.left;
 
     // ─── Tabela: Reservas ────────────────────────────────────────
     if (ev.reservas.length > 0) {
-      doc.fillColor(COR_PRIMARIA).fontSize(11).font('Helvetica-Bold').text('RESERVAS');
+      doc.x = doc.page.margins.left;
+      const larguraTotal = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      doc.fillColor(COR_PRIMARIA).fontSize(11).font('Helvetica-Bold')
+        .text('RESERVAS', { width: larguraTotal, align: 'left', lineBreak: false });
       doc.moveDown(0.3);
 
       const cols = [
@@ -427,7 +436,10 @@ export class EventosService {
     // ─── Tabela: Saidas vinculadas ────────────────────────────────
     if (ev.movimentacoes.length > 0) {
       if (doc.y > doc.page.height - 180) doc.addPage();
-      doc.fillColor(COR_PRIMARIA).fontSize(11).font('Helvetica-Bold').text('SAÍDAS REALIZADAS');
+      doc.x = doc.page.margins.left;
+      const larguraTotal = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      doc.fillColor(COR_PRIMARIA).fontSize(11).font('Helvetica-Bold')
+        .text('SAÍDAS REALIZADAS', { width: larguraTotal, align: 'left', lineBreak: false });
       doc.moveDown(0.3);
 
       const cols = [
