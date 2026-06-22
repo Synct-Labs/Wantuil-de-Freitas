@@ -15,12 +15,12 @@ const NAV: { grupo: string; links: NavLinkDef[] }[] = [
     { to: '/saidas', label: 'Saídas', icon: 'arrow-up', requer: 'mov.saida' },
   ]},
   { grupo: 'Controle', links: [
-    { to: '/validade', label: 'Validade', icon: 'clock', requer: 'mov.descarte' },
-    { to: '/setores', label: 'Setores', icon: 'building' },
-    { to: '/eventos', label: 'Eventos', icon: 'calendar' },
+    { to: '/validade', label: 'Validade', icon: 'clock', requer: 'validade.ver' },
+    { to: '/setores', label: 'Setores', icon: 'building', requer: 'setores.ver' },
+    { to: '/eventos', label: 'Eventos', icon: 'calendar', requer: 'eventos.ver' },
   ]},
   { grupo: 'Cadastros', links: [
-    { to: '/doadores', label: 'Doadores', icon: 'heart', requer: 'doadores.editar' },
+    { to: '/doadores', label: 'Doadores', icon: 'heart', requer: 'doadores.ver' },
   ]},
   { grupo: 'Análise', links: [
     { to: '/relatorios', label: 'Relatórios', icon: 'chart-bar', requer: 'relatorios.ver' },

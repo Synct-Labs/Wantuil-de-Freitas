@@ -563,27 +563,40 @@ function Notificacoes() {
         </div>
       </div>
 
-      {/* E-mail (apenas MASTER — testes e diagnostico do Resend) */}
+      {/* E-mail (apenas MASTER — testes e diagnóstico do Resend) */}
       {podeEmailTeste && (
       <div className="card">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
           <Icon name="mail" size={16} color="var(--primary-dk)" />
-          <span style={{ fontSize: 13, fontWeight: 600 }}>E-mail (resumo semanal)</span>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>E-mail via Resend</span>
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 14, lineHeight: 1.5 }}>
-          Além das notificações no sistema, alertas e o resumo de sábado são enviados por e-mail
-          para <strong>todos os usuários cadastrados</strong> que tiverem a opção
-          <em> "Receber notificações por e-mail"</em> marcada (gerenciado na aba <strong>Usuários</strong>).
-          A configuração técnica do servidor (variáveis <code>RESEND_API_KEY</code> e <code>EMAIL_FROM</code>)
-          é feita no <code>.env</code> da VPS.
+          Alertas e o resumo semanal de sábado são enviados por e-mail para{' '}
+          <strong>todos os usuários ativos</strong> que tiverem{' '}
+          <em>"Receber notificações por e-mail"</em> marcado (aba <strong>Usuários</strong>).
+          As variáveis <code>RESEND_API_KEY</code> e <code>EMAIL_FROM</code> são configuradas
+          no <code>.env</code> da VPS.
         </div>
+
+        {/* Instruções de diagnóstico rápido */}
+        <div style={{ padding: '10px 12px', borderRadius: 6, background: 'var(--surface-2)',
+          fontSize: 11, color: 'var(--text-2)', lineHeight: 1.7, marginBottom: 14 }}>
+          <strong>Se o e-mail não chega:</strong>
+          {' '}1) Clique em <em>Ver diagnóstico</em> e confira as 3 linhas.
+          {' '}2) Se <code>EMAIL_FROM</code> usa <code>onboarding@resend.dev</code>,
+          o Resend só entrega para o e-mail da conta criada em{' '}
+          <strong>resend.com</strong> — todos os outros destinatários são descartados silenciosamente.
+          {' '}3) Para enviar a qualquer endereço, valide o domínio <strong>syncontrol.cloud</strong>{' '}
+          (ou outro) em <strong>resend.com → Domains</strong> e atualize o <code>EMAIL_FROM</code> no <code>.env</code>.
+        </div>
+
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button className="btn" onClick={verDiagnostico} disabled={!!acaoAtiva}>
             {acaoAtiva === 'diag'
-              ? <><span className="spinner" /> Carregando…</>
-              : <><Icon name="info" size={14} /> Ver configuração</>}
+              ? <><span className="spinner" /> Verificando…</>
+              : <><Icon name="info" size={14} /> Ver diagnóstico</>}
           </button>
-          <button className="btn" onClick={testarEmail} disabled={!!acaoAtiva}>
+          <button className="btn primary" onClick={testarEmail} disabled={!!acaoAtiva}>
             {acaoAtiva === 'email'
               ? <><span className="spinner" /> Enviando…</>
               : <><Icon name="mail" size={14} /> Enviar e-mail de teste</>}
@@ -592,21 +605,42 @@ function Notificacoes() {
 
         {diagnostico && (
           <div style={{ marginTop: 14, padding: 12, borderRadius: 6,
-            background: diagnostico.configurado ? 'var(--green-bg)' : 'var(--a-50)',
-            border: `1px solid ${diagnostico.configurado ? 'var(--green)' : 'var(--a-200)'}`,
+            background: diagnostico.configurado ? 'var(--green-bg)' : 'var(--r-50)',
+            border: `1px solid ${diagnostico.configurado ? 'var(--green)' : 'var(--r-200)'}`,
             fontSize: 12 }}>
-            <div style={{ fontWeight: 600, marginBottom: 6,
-              color: diagnostico.configurado ? 'var(--green)' : 'var(--a-600)' }}>
-              {diagnostico.configurado ? 'Configuração OK' : 'Configuração incompleta'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, marginBottom: 10,
+              color: diagnostico.configurado ? 'var(--green)' : 'var(--r-600)' }}>
+              <Icon name={diagnostico.configurado ? 'check' : 'alert-circle'} size={14} />
+              {diagnostico.configurado ? '✓ Configuração OK — e-mails devem chegar' : 'Configuração incompleta — e-mails NÃO serão enviados'}
             </div>
-            <div style={{ fontFamily: 'monospace', fontSize: 11, lineHeight: 1.8, color: 'var(--text-2)' }}>
-              {Object.entries(diagnostico.detalhes).map(([k, v]) => (
-                <div key={k}><strong>{k}:</strong> {String(v)}</div>
-              ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {Object.entries(diagnostico.detalhes).map(([k, v]) => {
+                const val = String(v);
+                const ok = val.startsWith('OK') || val.includes('✓') || val.includes('usuário');
+                const err = val.startsWith('FALTANDO') || val.includes('FALTANDO');
+                return (
+                  <div key={k} style={{ display: 'flex', gap: 8, alignItems: 'flex-start',
+                    padding: '6px 8px', borderRadius: 5,
+                    background: ok ? 'rgba(var(--green-rgb,34,197,94),0.08)' : err ? 'var(--r-50)' : 'var(--surface-2)' }}>
+                    <Icon
+                      name={ok ? 'check' : err ? 'x' : 'info'}
+                      size={12}
+                      color={ok ? 'var(--green)' : err ? 'var(--r-600)' : 'var(--text-3)'}
+                      style={{ marginTop: 2, flexShrink: 0 }}
+                    />
+                    <div style={{ fontFamily: 'monospace', fontSize: 11, lineHeight: 1.6 }}>
+                      <strong>{k}:</strong>{' '}
+                      <span style={{ color: ok ? 'var(--green)' : err ? 'var(--r-600)' : 'var(--text-2)' }}>{val}</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
             {diagnostico.observacao && (
-              <div style={{ marginTop: 8, fontSize: 11, color: 'var(--a-600)', lineHeight: 1.5 }}>
-                ⚠ {diagnostico.observacao}
+              <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 5,
+                background: 'var(--a-50)', border: '1px solid var(--a-200)',
+                fontSize: 11, color: 'var(--a-700)', lineHeight: 1.6 }}>
+                <strong>⚠ Atenção:</strong> {diagnostico.observacao}
               </div>
             )}
           </div>

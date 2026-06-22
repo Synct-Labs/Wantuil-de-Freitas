@@ -11,7 +11,6 @@ import Validade from './pages/Validade';
 import Setores from './pages/Setores';
 import Eventos from './pages/Eventos';
 import Doadores from './pages/Doadores';
-// import Beneficiarios from './pages/Beneficiarios';  // OCULTADO v2.7.4 (Wantuil não usa)
 import Relatorios from './pages/Relatorios';
 import Configuracoes from './pages/Configuracoes';
 
@@ -48,11 +47,10 @@ export default function App() {
           <Route path="itens" element={<Itens />} />
           <Route path="entradas" element={<RequerPermissao acao="mov.entrada"><Entradas /></RequerPermissao>} />
           <Route path="saidas" element={<RequerPermissao acao="mov.saida"><Saidas /></RequerPermissao>} />
-          <Route path="validade" element={<Validade />} />
-          <Route path="setores" element={<Setores />} />
-          <Route path="eventos" element={<Eventos />} />
-          <Route path="doadores" element={<Doadores />} />
-          {/* <Route path="beneficiarios" element={<Beneficiarios />} />  OCULTADO v2.7.4 */}
+          <Route path="validade" element={<RequerPermissao acao="validade.ver"><Validade /></RequerPermissao>} />
+          <Route path="setores" element={<RequerPermissao acao="setores.ver"><Setores /></RequerPermissao>} />
+          <Route path="eventos" element={<RequerPermissao acao="eventos.ver"><Eventos /></RequerPermissao>} />
+          <Route path="doadores" element={<RequerPermissao acao="doadores.ver"><Doadores /></RequerPermissao>} />
           <Route path="relatorios" element={<RequerPermissao acao="relatorios.ver"><Relatorios /></RequerPermissao>} />
           <Route path="configuracoes" element={<RequerPermissao acao="configuracoes"><Configuracoes /></RequerPermissao>} />
         </Route>
