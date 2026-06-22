@@ -19,22 +19,22 @@ export class MovimentacoesController {
     return this.service.findAll({ tipo, dataInicio, dataFim, setorId });
   }
 
-  @Post('entrada') @Perfis('ADMIN', 'ALMOXARIFE')
+  @Post('entrada') @Perfis('MASTER', 'ADMIN', 'ALMOXARIFE')
   entrada(@Req() req: any, @Body() dto: any) {
     return this.service.registrarEntrada(req.user.id, dto);
   }
 
-  @Post('saida') @Perfis('ADMIN', 'ALMOXARIFE')
+  @Post('saida') @Perfis('MASTER', 'ADMIN', 'ALMOXARIFE', 'OPERADOR')
   saida(@Req() req: any, @Body() dto: any) {
     return this.service.registrarSaida(req.user.id, dto);
   }
 
-  @Post('descarte') @Perfis('ADMIN', 'ALMOXARIFE')
+  @Post('descarte') @Perfis('MASTER', 'ADMIN', 'ALMOXARIFE')
   descarte(@Req() req: any, @Body() dto: any) {
     return this.service.registrarDescarte(req.user.id, dto);
   }
 
-  @Post(':id/estorno') @Perfis('ADMIN')
+  @Post(':id/estorno') @Perfis('MASTER', 'ADMIN')
   estorno(@Req() req: any, @Param('id') id: string) {
     return this.service.estornar(req.user.id, id);
   }

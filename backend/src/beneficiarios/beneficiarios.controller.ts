@@ -12,12 +12,12 @@ export class BeneficiariosController {
   @Get() findAll(@Query('busca') busca?: string) { return this.service.findAll(busca); }
   @Get(':id/historico') historico(@Param('id') id: string) { return this.service.historico(id); }
 
-  @Post() @Perfis('ADMIN', 'ALMOXARIFE', 'OPERADOR')
+  @Post() @Perfis('MASTER', 'ADMIN', 'ALMOXARIFE')
   create(@Body() dto: any) { return this.service.create(dto); }
 
-  @Patch(':id') @Perfis('ADMIN', 'ALMOXARIFE', 'OPERADOR')
+  @Patch(':id') @Perfis('MASTER', 'ADMIN', 'ALMOXARIFE')
   update(@Param('id') id: string, @Body() dto: any) { return this.service.update(id, dto); }
 
-  @Delete(':id') @Perfis('ADMIN')
+  @Delete(':id') @Perfis('MASTER', 'ADMIN')
   excluir(@Param('id') id: string) { return this.service.excluir(id); }
 }

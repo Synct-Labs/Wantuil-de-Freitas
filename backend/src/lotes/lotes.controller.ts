@@ -36,7 +36,7 @@ export class LotesController {
     return this.service.findById(id);
   }
 
-  @Patch(':id') @Perfis('ADMIN', 'ALMOXARIFE')
+  @Patch(':id') @Perfis('MASTER', 'ADMIN', 'ALMOXARIFE')
   atualizar(@Param('id') id: string, @Body() dto: any) {
     return this.service.atualizar(id, dto);
   }

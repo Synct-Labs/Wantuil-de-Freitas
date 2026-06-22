@@ -1,12 +1,22 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 
-const PERFIS_VALIDOS = ['ADMIN', 'ALMOXARIFE', 'GESTOR', 'OPERADOR'];
+const PERFIS_VALIDOS = ['MASTER', 'ADMIN', 'ALMOXARIFE', 'GESTOR', 'OPERADOR'];
 
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {}
+
+  /**
+   * Apenas MASTER pode criar/editar/excluir outros MASTERs.
+   * ADMIN consegue gerenciar ADMIN, ALMOXARIFE, GESTOR, OPERADOR.
+   */
+  private exigirMasterParaTocarEm(perfilAlvo: string, perfilAtor: string) {
+    if (perfilAlvo === 'MASTER' && perfilAtor !== 'MASTER') {
+      throw new ForbiddenException('Apenas usuarios MASTER podem gerenciar contas MASTER');
+    }
+  }
 
   findAll() {
     return this.prisma.usuario.findMany({
@@ -22,7 +32,10 @@ export class UsersService {
     });
   }
 
-  async create(data: { nome: string; email: string; senha: string; perfil: string; receberEmail?: boolean }) {
+  async create(
+    data: { nome: string; email: string; senha: string; perfil: string; receberEmail?: boolean },
+    perfilAtor: string,
+  ) {
     if (!data.email || !data.senha) {
       throw new BadRequestException('E-mail e senha sao obrigatorios');
     }
@@ -32,6 +45,7 @@ export class UsersService {
     if (!PERFIS_VALIDOS.includes(data.perfil)) {
       throw new BadRequestException(`Perfil invalido. Use: ${PERFIS_VALIDOS.join(', ')}`);
     }
+    this.exigirMasterParaTocarEm(data.perfil, perfilAtor);
 
     const emailNormalizado = data.email.trim().toLowerCase();
     const existe = await this.prisma.usuario.findUnique({ where: { email: emailNormalizado } });
@@ -53,9 +67,14 @@ export class UsersService {
     return { id: u.id, nome: u.nome, email: u.email, perfil: u.perfil, ativo: u.ativo, receberEmail: u.receberEmail };
   }
 
-  async update(id: string, data: any) {
+  async update(id: string, data: any, perfilAtor: string) {
     const usuario = await this.prisma.usuario.findUnique({ where: { id } });
     if (!usuario) throw new NotFoundException('Usuario nao encontrado');
+
+    // Bloqueia ADMIN de editar um MASTER existente
+    this.exigirMasterParaTocarEm(usuario.perfil, perfilAtor);
+    // Bloqueia ADMIN de PROMOVER alguem para MASTER
+    if (data.perfil) this.exigirMasterParaTocarEm(data.perfil, perfilAtor);
 
     const updateData: any = {};
     if (data.nome !== undefined) updateData.nome = data.nome;
@@ -77,16 +96,17 @@ export class UsersService {
     return { id: u.id, nome: u.nome, email: u.email, perfil: u.perfil, ativo: u.ativo, receberEmail: u.receberEmail };
   }
 
-  async desativar(id: string, idLogado: string) {
+  async desativar(id: string, idLogado: string, perfilAtor: string) {
     if (id === idLogado) {
       throw new BadRequestException('Voce nao pode desativar a si mesmo');
     }
     const usuario = await this.prisma.usuario.findUnique({ where: { id } });
     if (!usuario) throw new NotFoundException('Usuario nao encontrado');
+    this.exigirMasterParaTocarEm(usuario.perfil, perfilAtor);
     return this.prisma.usuario.update({ where: { id }, data: { ativo: false } });
   }
 
-  async excluir(id: string, idLogado: string) {
+  async excluir(id: string, idLogado: string, perfilAtor: string) {
     if (id === idLogado) {
       throw new BadRequestException('Voce nao pode excluir a si mesmo');
     }
@@ -95,6 +115,7 @@ export class UsersService {
       include: { _count: { select: { movimentacoes: true, logs: true } } },
     });
     if (!usuario) throw new NotFoundException('Usuario nao encontrado');
+    this.exigirMasterParaTocarEm(usuario.perfil, perfilAtor);
 
     // Se tiver historico, apenas desativa para preservar referencias (RN-03)
     if (usuario._count.movimentacoes > 0 || usuario._count.logs > 0) {

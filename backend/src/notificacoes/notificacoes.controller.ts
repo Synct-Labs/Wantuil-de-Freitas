@@ -34,15 +34,15 @@ export class NotificacoesController {
   @Post('verificar-agora')
   verificarAgora() { return this.service.verificarItens(); }
 
-  // Dispara resumo semanal sob demanda (admin)
-  @Post('testar-resumo') @Perfis('ADMIN')
+  // Dispara resumo semanal sob demanda (apenas MASTER)
+  @Post('testar-resumo') @Perfis('MASTER')
   testarResumo() { return this.service.resumoSemanal(); }
 
-  // Diagnostico de configuracao de email
-  @Get('diagnostico-email') @Perfis('ADMIN')
+  // Diagnostico de configuracao de email (apenas MASTER)
+  @Get('diagnostico-email') @Perfis('MASTER')
   diagnostico() { return this.service.diagnosticoEmail(); }
 
-  // Envia email de teste
-  @Post('testar-email') @Perfis('ADMIN')
+  // Envia email de teste (apenas MASTER)
+  @Post('testar-email') @Perfis('MASTER')
   testarEmail() { return this.service.testarEmail(); }
 }

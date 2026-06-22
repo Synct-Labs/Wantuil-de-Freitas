@@ -6,7 +6,7 @@ import { SistemaService } from './sistema.service';
 
 @Controller('sistema')
 @UseGuards(JwtGuard, PerfilGuard)
-@Perfis('ADMIN')
+@Perfis('MASTER')
 export class SistemaController {
   constructor(private service: SistemaService) {}
 

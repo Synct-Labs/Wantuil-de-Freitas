@@ -10,32 +10,34 @@ export class UsersController {
   constructor(private service: UsersService) {}
 
   @Get()
-  @Perfis('ADMIN')
+  @Perfis('MASTER', 'ADMIN')
   findAll() { return this.service.findAll(); }
 
   @Get(':id')
-  @Perfis('ADMIN')
+  @Perfis('MASTER', 'ADMIN')
   findOne(@Param('id') id: string) { return this.service.findOne(id); }
 
   @Post()
-  @Perfis('ADMIN')
-  create(@Body() dto: any) { return this.service.create(dto); }
+  @Perfis('MASTER', 'ADMIN')
+  create(@Body() dto: any, @Req() req: any) {
+    return this.service.create(dto, req.user.perfil);
+  }
 
   @Patch(':id')
-  @Perfis('ADMIN')
-  update(@Param('id') id: string, @Body() dto: any) {
-    return this.service.update(id, dto);
+  @Perfis('MASTER', 'ADMIN')
+  update(@Param('id') id: string, @Body() dto: any, @Req() req: any) {
+    return this.service.update(id, dto, req.user.perfil);
   }
 
   @Delete(':id')
-  @Perfis('ADMIN')
+  @Perfis('MASTER', 'ADMIN')
   excluir(@Param('id') id: string, @Req() req: any) {
-    return this.service.excluir(id, req.user.id);
+    return this.service.excluir(id, req.user.id, req.user.perfil);
   }
 
   @Patch(':id/desativar')
-  @Perfis('ADMIN')
+  @Perfis('MASTER', 'ADMIN')
   desativar(@Param('id') id: string, @Req() req: any) {
-    return this.service.desativar(id, req.user.id);
+    return this.service.desativar(id, req.user.id, req.user.perfil);
   }
 }

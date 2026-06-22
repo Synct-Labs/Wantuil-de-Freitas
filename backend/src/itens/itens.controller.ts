@@ -20,15 +20,15 @@ export class ItensController {
   @Get('ean/:ean')
   findByEan(@Param('ean') ean: string) { return this.service.findByEan(ean); }
 
-  @Post() @Perfis('ADMIN', 'ALMOXARIFE')
+  @Post() @Perfis('MASTER', 'ADMIN', 'ALMOXARIFE')
   create(@Body() dto: any) { return this.service.create(dto); }
 
-  @Patch(':id') @Perfis('ADMIN', 'ALMOXARIFE')
+  @Patch(':id') @Perfis('MASTER', 'ADMIN', 'ALMOXARIFE')
   update(@Param('id') id: string, @Body() dto: any) { return this.service.update(id, dto); }
 
-  @Patch(':id/desativar') @Perfis('ADMIN', 'ALMOXARIFE')
+  @Patch(':id/desativar') @Perfis('MASTER', 'ADMIN', 'ALMOXARIFE')
   desativar(@Param('id') id: string) { return this.service.desativar(id); }
 
-  @Delete(':id') @Perfis('ADMIN')
+  @Delete(':id') @Perfis('MASTER', 'ADMIN')
   excluir(@Param('id') id: string) { return this.service.excluir(id); }
 }

@@ -11,7 +11,7 @@ export class SetoresController {
 
   @Get() findAll() { return this.service.findAll(); }
   @Get(':id') detalhe(@Param('id') id: string) { return this.service.detalhe(id); }
-  @Post() @Perfis('ADMIN') create(@Body() dto: any) { return this.service.create(dto); }
-  @Patch(':id') @Perfis('ADMIN') update(@Param('id') id: string, @Body() dto: any) { return this.service.update(id, dto); }
-  @Delete(':id') @Perfis('ADMIN') excluir(@Param('id') id: string) { return this.service.excluir(id); }
+  @Post() @Perfis('MASTER', 'ADMIN') create(@Body() dto: any) { return this.service.create(dto); }
+  @Patch(':id') @Perfis('MASTER', 'ADMIN') update(@Param('id') id: string, @Body() dto: any) { return this.service.update(id, dto); }
+  @Delete(':id') @Perfis('MASTER', 'ADMIN') excluir(@Param('id') id: string) { return this.service.excluir(id); }
 }

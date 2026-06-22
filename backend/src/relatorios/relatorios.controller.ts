@@ -7,7 +7,7 @@ import { RelatoriosService } from './relatorios.service';
 
 @Controller('relatorios')
 @UseGuards(JwtGuard, PerfilGuard)
-@Perfis('ADMIN', 'ALMOXARIFE', 'GESTOR')
+@Perfis('MASTER', 'ADMIN', 'ALMOXARIFE', 'GESTOR')
 export class RelatoriosController {
   constructor(private service: RelatoriosService) {}
 
@@ -40,7 +40,7 @@ export class RelatoriosController {
     return this.service.resumoExecutivo(di, df);
   }
 
-  @Get('auditoria') @Perfis('ADMIN')
+  @Get('auditoria') @Perfis('MASTER')
   auditoria(@Query('dataInicio') di: string, @Query('dataFim') df: string) {
     return this.service.logAuditoria(di, df);
   }
@@ -115,7 +115,7 @@ export class RelatoriosController {
     enviarPdf(res, buf, 'resumo_executivo.pdf');
   }
 
-  @Get('auditoria/pdf') @Perfis('ADMIN')
+  @Get('auditoria/pdf') @Perfis('MASTER')
   async auditoriaPdf(@Res() res: Response, @Query('dataInicio') di: string, @Query('dataFim') df: string) {
     const buf = await this.service.pdfAuditoria(di, df);
     enviarPdf(res, buf, 'auditoria.pdf');

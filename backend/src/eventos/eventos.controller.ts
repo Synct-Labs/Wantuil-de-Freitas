@@ -21,31 +21,31 @@ export class EventosController {
   @Get(':id')
   findById(@Param('id') id: string) { return this.service.findById(id); }
 
-  @Post() @Perfis('ADMIN', 'ALMOXARIFE', 'GESTOR')
+  @Post() @Perfis('MASTER', 'ADMIN', 'ALMOXARIFE')
   criar(@Body() dto: any) { return this.service.criar(dto); }
 
-  @Patch(':id') @Perfis('ADMIN', 'ALMOXARIFE', 'GESTOR')
+  @Patch(':id') @Perfis('MASTER', 'ADMIN', 'ALMOXARIFE')
   atualizar(@Param('id') id: string, @Body() dto: any) { return this.service.atualizar(id, dto); }
 
-  @Delete(':id') @Perfis('ADMIN', 'GESTOR')
+  @Delete(':id') @Perfis('MASTER', 'ADMIN')
   excluir(@Param('id') id: string) { return this.service.excluir(id); }
 
-  @Post(':id/iniciar') @Perfis('ADMIN', 'ALMOXARIFE', 'GESTOR')
+  @Post(':id/iniciar') @Perfis('MASTER', 'ADMIN', 'ALMOXARIFE')
   iniciar(@Param('id') id: string) { return this.service.iniciar(id); }
 
-  @Post(':id/finalizar') @Perfis('ADMIN', 'ALMOXARIFE', 'GESTOR')
+  @Post(':id/finalizar') @Perfis('MASTER', 'ADMIN', 'ALMOXARIFE')
   finalizar(@Param('id') id: string) { return this.service.finalizar(id); }
 
-  @Post(':id/cancelar') @Perfis('ADMIN', 'GESTOR')
+  @Post(':id/cancelar') @Perfis('MASTER', 'ADMIN')
   cancelar(@Param('id') id: string) { return this.service.cancelar(id); }
 
   // Reservas
-  @Post(':id/reservas') @Perfis('ADMIN', 'ALMOXARIFE', 'GESTOR')
+  @Post(':id/reservas') @Perfis('MASTER', 'ADMIN', 'ALMOXARIFE')
   adicionarReserva(@Param('id') id: string, @Body() dto: any) {
     return this.service.adicionarReserva(id, dto);
   }
 
-  @Delete(':id/reservas/:reservaId') @Perfis('ADMIN', 'ALMOXARIFE', 'GESTOR')
+  @Delete(':id/reservas/:reservaId') @Perfis('MASTER', 'ADMIN', 'ALMOXARIFE')
   removerReserva(@Param('id') id: string, @Param('reservaId') reservaId: string) {
     return this.service.removerReserva(id, reservaId);
   }
