@@ -54,7 +54,7 @@ export default function App() {
           <Route path="doadores" element={<Doadores />} />
           {/* <Route path="beneficiarios" element={<Beneficiarios />} />  OCULTADO v2.7.4 */}
           <Route path="relatorios" element={<RequerPermissao acao="relatorios.ver"><Relatorios /></RequerPermissao>} />
-          <Route path="configuracoes" element={<RequerPermissao acao="configuracoes"><Configuracoes /></RequerPermissao>} />
+          <Route path="configuracoes" element={<RequerPermissao acao="config.geral"><Configuracoes /></RequerPermissao>} />
         </Route>
       </Routes>
     </AuthProvider>
