@@ -95,7 +95,7 @@ export default function Layout() {
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase',
               letterSpacing: '.06em', marginTop: 2 }}>{usuario?.perfil}</div>
           </div>
-          {podeFazer('configuracoes') && (
+          {podeFazer('config.geral') && (
             <NavLink to="/configuracoes" onClick={() => setMenuOpen(false)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 9,
