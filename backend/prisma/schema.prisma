@@ -62,8 +62,27 @@ model Usuario {
 
   movimentacoes Movimentacao[]
   logs          LogAuditoria[]
+  tokensSenha   TokenSenha[]
 
   @@map("usuarios")
+}
+
+/// Token de uso unico para o usuario definir sua propria senha.
+/// Usado em dois fluxos: (a) convite ao criar usuario novo;
+/// (b) recuperacao de senha esquecida via "Esqueci minha senha".
+model TokenSenha {
+  id        String   @id @default(uuid())
+  token     String   @unique // string aleatoria gerada com crypto.randomBytes
+  usuarioId String   @map("usuario_id")
+  tipo      String   // 'CONVITE' (7 dias) ou 'RESET' (1 hora)
+  expiraEm  DateTime @map("expira_em")
+  usado     Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@map("tokens_senha")
 }
 
 model Categoria {

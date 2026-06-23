@@ -1,12 +1,16 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuthService } from '../auth/auth.service';
 
 const PERFIS_VALIDOS = ['MASTER', 'ADMIN', 'ALMOXARIFE', 'GESTOR', 'OPERADOR'];
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private authService: AuthService,
+  ) {}
 
   /**
    * Apenas MASTER pode criar/editar/excluir outros MASTERs.
@@ -33,13 +37,17 @@ export class UsersService {
   }
 
   async create(
-    data: { nome: string; email: string; senha: string; perfil: string; receberEmail?: boolean },
+    data: { nome: string; email: string; senha?: string; perfil: string; receberEmail?: boolean },
     perfilAtor: string,
   ) {
-    if (!data.email || !data.senha) {
-      throw new BadRequestException('E-mail e senha sao obrigatorios');
+    if (!data.email) {
+      throw new BadRequestException('E-mail e obrigatorio');
     }
-    if (data.senha.length < 6) {
+    // Senha agora e OPCIONAL. Se vier, deve atender ao minimo.
+    // Se nao vier, geramos uma senha aleatoria temporaria e enviamos convite
+    // por email para o usuario definir a propria.
+    const senhaInformada = !!data.senha;
+    if (senhaInformada && data.senha!.length < 6) {
       throw new BadRequestException('Senha deve ter no minimo 6 caracteres');
     }
     if (!PERFIS_VALIDOS.includes(data.perfil)) {
@@ -51,7 +59,13 @@ export class UsersService {
     const existe = await this.prisma.usuario.findUnique({ where: { email: emailNormalizado } });
     if (existe) throw new ConflictException('E-mail ja cadastrado');
 
-    const senhaHash = await bcrypt.hash(data.senha, 10);
+    // Sempre cria uma senha hashed: se o admin informou, usa; senao gera
+    // string aleatoria (que nao sera usada para login, ja que o usuario
+    // vai definir a propria via link no email).
+    const senhaPlana = senhaInformada
+      ? data.senha!
+      : require('crypto').randomBytes(24).toString('hex');
+    const senhaHash = await bcrypt.hash(senhaPlana, 10);
 
     const u = await this.prisma.usuario.create({
       data: {
@@ -64,7 +78,21 @@ export class UsersService {
       },
     });
 
-    return { id: u.id, nome: u.nome, email: u.email, perfil: u.perfil, ativo: u.ativo, receberEmail: u.receberEmail };
+    // Se admin nao informou senha, dispara o email de convite
+    let conviteEnviado: { enviado: boolean; motivo?: string } | undefined;
+    if (!senhaInformada) {
+      try {
+        conviteEnviado = await this.authService.gerarTokenESnviarEmail(u.id, 'CONVITE');
+      } catch (e: any) {
+        conviteEnviado = { enviado: false, motivo: e.message };
+      }
+    }
+
+    return {
+      id: u.id, nome: u.nome, email: u.email,
+      perfil: u.perfil, ativo: u.ativo, receberEmail: u.receberEmail,
+      conviteEnviado,
+    };
   }
 
   async update(id: string, data: any, perfilAtor: string) {
