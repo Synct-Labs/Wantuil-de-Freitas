@@ -83,6 +83,34 @@ Atualmente roda em VPS própria gerenciada pela SYNCT Labs:
 
 ## Instalação em desenvolvimento
 
+### Opção A — Docker (recomendado)
+
+Sobe banco + backend + frontend em 3 containers com 1 comando.
+
+```bash
+# 1. Configurar variáveis (gera senha forte e JWT secret)
+cp .env.example .env
+# Edite o .env preenchendo POSTGRES_PASSWORD e JWT_SECRET
+# Dica: openssl rand -hex 32  → senha de banco
+#       openssl rand -hex 64  → JWT_SECRET
+
+# 2. Subir tudo
+docker compose up -d
+
+# 3. Acompanhar logs
+docker compose logs -f backend
+
+# Acesso:
+# - Frontend: http://localhost:8080
+# - API:      http://localhost:8080/api
+# - Docs:     http://localhost:8080/api/docs
+# - Health:   http://localhost:8080/health
+```
+
+Pra desligar: `docker compose down`. Pra resetar com banco zerado: `docker compose down -v` (apaga o volume).
+
+### Opção B — Sem Docker (clássico)
+
 ### Pré-requisitos
 - Node.js 20+
 - PostgreSQL 14+ rodando localmente
