@@ -48,9 +48,14 @@ export class RelatoriosController {
 
   // ═══════════ EXCEL ═══════════
   @Get('estoque/excel')
-  async estoqueExcel(@Res() res: Response, @Query('setorId') setorId?: string) {
-    const buf = await this.service.excelPosicaoEstoque(setorId);
-    enviarPlanilha(res, buf, 'posicao_estoque.xlsx');
+  async estoqueExcel(@Res() res: Response,
+    @Query('setorId') setorId?: string,
+    @Query('agregado') agregado?: string) {
+    const usarAgregado = agregado !== 'false'; // default: true
+    const buf = usarAgregado
+      ? await this.service.excelPosicaoEstoquePorProduto(setorId)
+      : await this.service.excelPosicaoEstoque(setorId);
+    enviarPlanilha(res, buf, usarAgregado ? 'posicao_estoque_por_produto.xlsx' : 'posicao_estoque.xlsx');
   }
 
   @Get('movimentacoes/excel')
@@ -80,9 +85,14 @@ export class RelatoriosController {
 
   // ═══════════ PDF ═══════════
   @Get('estoque/pdf')
-  async estoquePdf(@Res() res: Response, @Query('setorId') setorId?: string) {
-    const buf = await this.service.pdfPosicaoEstoque(setorId);
-    enviarPdf(res, buf, 'posicao_estoque.pdf');
+  async estoquePdf(@Res() res: Response,
+    @Query('setorId') setorId?: string,
+    @Query('agregado') agregado?: string) {
+    const usarAgregado = agregado !== 'false'; // default: true
+    const buf = usarAgregado
+      ? await this.service.pdfPosicaoEstoquePorProduto(setorId)
+      : await this.service.pdfPosicaoEstoque(setorId);
+    enviarPdf(res, buf, usarAgregado ? 'posicao_estoque_por_produto.pdf' : 'posicao_estoque.pdf');
   }
 
   @Get('movimentacoes/pdf')

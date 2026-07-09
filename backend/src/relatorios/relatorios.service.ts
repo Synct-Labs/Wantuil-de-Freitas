@@ -319,6 +319,47 @@ export class RelatoriosService {
     });
   }
 
+  /**
+   * PDF de posicao de estoque AGREGADO POR PRODUTO BASE.
+   * 1 linha por produto (soma das marcas). Ideal para a diretoria e relatorios
+   * que nao precisam do detalhe de qual marca do arroz esta no estoque.
+   */
+  async pdfPosicaoEstoquePorProduto(setorId?: string): Promise<Buffer> {
+    const dados = await this.posicaoEstoquePorProduto(setorId);
+    let setorNome = '';
+    if (setorId) {
+      const s = await this.prisma.setor.findUnique({ where: { id: setorId } });
+      setorNome = s?.nome || '';
+    }
+    const valorTotal = dados.reduce((s, d) => s + d.saldo, 0);
+    const abaixoMinimo = dados.filter((d) => d.abaixoMinimo).length;
+
+    return gerarRelatorioPdf({
+      titulo: 'Posição de Estoque por Produto',
+      subtitulo: 'Saldo consolidado por produto (soma das marcas)',
+      filtros: setorNome ? [{ label: 'Setor', valor: setorNome }] : [],
+      orientacao: 'landscape',
+      resumo: [
+        { label: 'Produtos distintos', valor: dados.length },
+        { label: 'Quantidade total em estoque', valor: formatadores.numero(valorTotal) },
+        { label: 'Abaixo do mínimo', valor: abaixoMinimo },
+      ],
+      colunas: [
+        { titulo: 'Produto', campo: 'produto', largura: 0.32 },
+        { titulo: 'Categoria', campo: 'categoria', largura: 0.14 },
+        { titulo: 'Setores', campo: 'setores', largura: 0.16 },
+        { titulo: 'Saldo', campo: 'saldo', largura: 0.13, alinhamento: 'right',
+          formatar: (v, row) => `${formatadores.numero(v)} ${row.unidade}` },
+        { titulo: 'Mín.', campo: 'minimo', largura: 0.08, alinhamento: 'right', formatar: formatadores.numero },
+        { titulo: 'Marcas', campo: 'qtdMarcas', largura: 0.08, alinhamento: 'right',
+          formatar: (v) => v ? String(v) : '1' },
+        { titulo: 'Status', campo: 'abaixoMinimo', largura: 0.09,
+          formatar: (v) => v ? 'Abaixo mín.' : 'OK' },
+      ],
+      linhas: dados,
+    });
+  }
+
   async pdfMovimentacoes(dataInicio: string, dataFim: string, setorId?: string, tipo?: string): Promise<Buffer> {
     const movs = await this.movimentacoes(dataInicio, dataFim, setorId, tipo);
     const linhas: any[] = [];
@@ -522,6 +563,50 @@ export class RelatoriosService {
       const row = ws.addRow(d);
       if (d.abaixoMinimo) {
         row.getCell('saldo').font = { color: { argb: 'FFB0312D' }, bold: true };
+      }
+    }
+    return Buffer.from(await wb.xlsx.writeBuffer());
+  }
+
+  /**
+   * Excel de posicao de estoque AGREGADO POR PRODUTO BASE.
+   * Cada linha e um produto (ex: "Arroz 5kg"), somando saldos das marcas.
+   * Itens sem produtoBase aparecem isolados como se fossem um produto proprio.
+   */
+  async excelPosicaoEstoquePorProduto(setorId?: string): Promise<Buffer> {
+    const dados = await this.posicaoEstoquePorProduto(setorId);
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Posição de Estoque por Produto');
+    ws.columns = [
+      { header: 'Produto', key: 'produto', width: 40 },
+      { header: 'Categoria', key: 'categoria', width: 18 },
+      { header: 'Setores', key: 'setores', width: 24 },
+      { header: 'Saldo total', key: 'saldo', width: 12 },
+      { header: 'Un', key: 'unidade', width: 8 },
+      { header: 'Mínimo', key: 'minimo', width: 10 },
+      { header: 'Abaixo do mínimo', key: 'alerta', width: 18 },
+      { header: 'Nº de marcas', key: 'qtdMarcas', width: 12 },
+      { header: 'Marcas (detalhe)', key: 'marcasDetalhe', width: 60 },
+    ];
+    this.aplicarCabecalhoExcel(ws);
+    for (const d of dados) {
+      const marcasDetalhe = d.marcas.length
+        ? d.marcas.map((m: any) => `${m.nome} (${m.saldo} ${d.unidade})`).join('; ')
+        : '—';
+      const row = ws.addRow({
+        produto: d.produto,
+        categoria: d.categoria,
+        setores: d.setores,
+        saldo: d.saldo,
+        unidade: d.unidade,
+        minimo: d.minimo,
+        alerta: d.abaixoMinimo ? 'SIM' : 'não',
+        qtdMarcas: d.qtdMarcas || 1,
+        marcasDetalhe,
+      });
+      if (d.abaixoMinimo) {
+        row.getCell('saldo').font = { color: { argb: 'FFB0312D' }, bold: true };
+        row.getCell('alerta').font = { color: { argb: 'FFB0312D' }, bold: true };
       }
     }
     return Buffer.from(await wb.xlsx.writeBuffer());

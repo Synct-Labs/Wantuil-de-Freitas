@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Icon from './Icon';
 
 /**
  * Input de data que aceita tanto digitacao manual (dd/mm/aaaa) quanto o
@@ -96,8 +97,10 @@ export default function InputData({ value, onChange, required, className, style,
       />
       <span style={{
         position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-        pointerEvents: 'none', fontSize: 14, color: 'var(--text-3)',
-      }}>📅</span>
+        pointerEvents: 'none', color: 'var(--text-3)', display: 'flex', alignItems: 'center',
+      }}>
+        <Icon name="calendar" size={14} />
+      </span>
     </div>
   );
 }

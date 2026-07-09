@@ -27,7 +27,7 @@ const RELATORIOS: RelatorioCard[] = [
   {
     id: 'estoque',
     titulo: 'Posição atual do estoque',
-    descricao: 'Saldo de cada item com unidade, mínimo e validade. Filtra por setor.',
+    descricao: 'Saldo consolidado por produto (soma das marcas) ou detalhado por marca. Filtra por setor.',
     icone: 'package', cor: 'petroleo',
     endpointBase: '/relatorios/estoque',
     precisaPeriodo: false, formatos: ['pdf', 'excel'],
@@ -89,6 +89,7 @@ export default function Relatorios() {
   const [dataInicio, setDataInicio] = useState(mesPassado.toISOString().split('T')[0]);
   const [dataFim, setDataFim] = useState(hoje);
   const [setorId, setSetorId] = useState('');
+  const [agrupamento, setAgrupamento] = useState<'produto' | 'marca'>('produto');
   const [baixando, setBaixando] = useState<string | null>(null);
 
   useEffect(() => { api.get('/setores').then((r) => setSetores(r.data)); }, []);
@@ -101,6 +102,7 @@ export default function Relatorios() {
       const params: any = {};
       if (rel.precisaPeriodo) { params.dataInicio = dataInicio; params.dataFim = dataFim; }
       if ((rel.id === 'estoque' || rel.id === 'movimentacoes') && setorId) params.setorId = setorId;
+      if (rel.id === 'estoque') params.agregado = agrupamento === 'produto' ? 'true' : 'false';
 
       const qs = new URLSearchParams(params).toString();
       const sufixo = formato === 'pdf' ? '/pdf' : '/excel';
@@ -160,6 +162,49 @@ export default function Relatorios() {
             <Icon name="alert-circle" size={14} /> A data inicial precisa ser anterior à data final.
           </div>
         )}
+
+        {/* Agrupamento do relatorio de estoque */}
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <Icon name="package" size={14} color="var(--text-2)" />
+            <span style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600,
+              textTransform: 'uppercase', letterSpacing: '.04em' }}>
+              Estoque — como agrupar os produtos
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <label style={{
+              flex: '1 1 220px', display: 'flex', alignItems: 'flex-start', gap: 10,
+              padding: '10px 12px', border: '1px solid', borderRadius: 8, cursor: 'pointer',
+              background: agrupamento === 'produto' ? 'var(--primary-bg)' : 'transparent',
+              borderColor: agrupamento === 'produto' ? 'var(--wf-azul)' : 'var(--border)',
+            }}>
+              <input type="radio" name="agrupamento" checked={agrupamento === 'produto'}
+                onChange={() => setAgrupamento('produto')} style={{ marginTop: 3 }} />
+              <span>
+                <span style={{ display: 'block', fontSize: 13, fontWeight: 600 }}>Por produto</span>
+                <span style={{ display: 'block', fontSize: 11, color: 'var(--text-3)', marginTop: 2, lineHeight: 1.4 }}>
+                  Soma todas as marcas. Ex: "Arroz 5kg — 44 un"
+                </span>
+              </span>
+            </label>
+            <label style={{
+              flex: '1 1 220px', display: 'flex', alignItems: 'flex-start', gap: 10,
+              padding: '10px 12px', border: '1px solid', borderRadius: 8, cursor: 'pointer',
+              background: agrupamento === 'marca' ? 'var(--primary-bg)' : 'transparent',
+              borderColor: agrupamento === 'marca' ? 'var(--wf-azul)' : 'var(--border)',
+            }}>
+              <input type="radio" name="agrupamento" checked={agrupamento === 'marca'}
+                onChange={() => setAgrupamento('marca')} style={{ marginTop: 3 }} />
+              <span>
+                <span style={{ display: 'block', fontSize: 13, fontWeight: 600 }}>Por marca (detalhado)</span>
+                <span style={{ display: 'block', fontSize: 11, color: 'var(--text-3)', marginTop: 2, lineHeight: 1.4 }}>
+                  Mostra cada marca. Ex: "Arroz Tio João 5kg — 1 un"
+                </span>
+              </span>
+            </label>
+          </div>
+        </div>
       </div>
 
       {/* Cards de relatorios */}

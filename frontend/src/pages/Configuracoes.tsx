@@ -154,8 +154,9 @@ function Sistema() {
         {resultadoLimpeza && (
           <div style={{ marginTop: 12, padding: 12, borderRadius: 8,
             background: 'var(--green-bg)', border: '1px solid var(--green)' }}>
-            <div style={{ fontWeight: 600, color: 'var(--green)', fontSize: 13, marginBottom: 6 }}>
-              ✓ {resultadoLimpeza.mensagem}
+            <div style={{ fontWeight: 600, color: 'var(--green)', fontSize: 13, marginBottom: 6,
+              display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Icon name="check-circle" size={14} /> {resultadoLimpeza.mensagem}
             </div>
             {(resultadoLimpeza.apagadas.categorias.length > 0 || resultadoLimpeza.apagadas.setores.length > 0) && (
               <div style={{ fontSize: 11, color: 'var(--text-2)', lineHeight: 1.6 }}>
@@ -195,8 +196,9 @@ function Sistema() {
         {resultado && (
           <div style={{ marginTop: 12, padding: 12, borderRadius: 8,
             background: 'var(--green-bg)', border: '1px solid var(--green)' }}>
-            <div style={{ fontWeight: 600, color: 'var(--green)', fontSize: 13, marginBottom: 6 }}>
-              ✓ {resultado.mensagem}
+            <div style={{ fontWeight: 600, color: 'var(--green)', fontSize: 13, marginBottom: 6,
+              display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Icon name="check-circle" size={14} /> {resultado.mensagem}
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-2)', lineHeight: 1.6 }}>
               {resultado.contagens.movimentacoes} movimentações,&nbsp;
